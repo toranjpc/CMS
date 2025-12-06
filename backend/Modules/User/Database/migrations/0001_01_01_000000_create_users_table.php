@@ -26,8 +26,6 @@ return new class extends Migration
             $table->string('password')->nullable();
             $table->string('mobile')->unique()->nullable();
             $table->timestamp('mobile_verified_at')->nullable();
-            // $table->string('email')->unique()->nullable();
-            // $table->timestamp('email_verified_at')->nullable();
 
             $table->foreignId('job')->nullable()->constrained('useroptions', 'id')->nullOnDelete();
             $table->json('per')->nullable();

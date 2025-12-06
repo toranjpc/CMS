@@ -48,7 +48,6 @@ class UserSeeder extends Seeder
                 'username' => 'admin',
                 'password' => Hash::make('0012300123'),
                 'mobile' => "09120703611",
-                'email' => 'admin@example.com',
                 'sex' => 1,
                 'job' => 1,
                 'status' => 1,

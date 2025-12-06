@@ -6,24 +6,23 @@
     <meta name="description" content="">
     <meta name="author" content="Mosaddek">
     <meta name="keyword" content="FlatLab, Dashboard, Bootstrap, Admin, Template, Theme, Responsive, Fluid, Retina">
-    <link rel="shortcut icon" href="img/favicon.html">
+    <link rel="shortcut icon" href="../img/favicon.html">
 
-    <title>Calendar</title>
+    <title>Profile</title>
 
     <!-- Bootstrap core CSS -->
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/bootstrap-reset.css" rel="stylesheet">
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../css/bootstrap-reset.css" rel="stylesheet">
     <!--external css-->
-    <link href="assets/font-awesome/css/font-awesome.css" rel="stylesheet" />
-    <link href="assets/fullcalendar/fullcalendar/bootstrap-fullcalendar.css" rel="stylesheet" />
+    <link href="../assets/font-awesome/css/font-awesome.css" rel="stylesheet" />
     <!-- Custom styles for this template -->
-    <link href="css/style.css" rel="stylesheet">
-    <link href="css/style-responsive.css" rel="stylesheet" />
+    <link href="../css/style.css" rel="stylesheet">
+    <link href="../css/style-responsive.css" rel="stylesheet" />
 
     <!-- HTML5 shim and Respond.js IE8 support of HTML5 tooltipss and media queries -->
     <!--[if lt IE 9]>
-      <script src="js/html5shiv.js"></script>
-      <script src="js/respond.min.js"></script>
+      <script src="../js/html5shiv.js"></script>
+      <script src="../js/respond.min.js"></script>
     <![endif]-->
   </head>
 
@@ -137,7 +136,7 @@
                       </li>
                       <li>
                           <a href="#">
-                              <span class="photo"><img alt="avatar" src="img/avatar-mini.jpg"></span>
+                              <span class="photo"><img alt="avatar" src="../img/avatar-mini.jpg"></span>
                                     <span class="subject">
                                     <span class="from">Jonathan Smith</span>
                                     <span class="time">Just now</span>
@@ -149,7 +148,7 @@
                       </li>
                       <li>
                           <a href="#">
-                              <span class="photo"><img alt="avatar" src="img/avatar-mini2.jpg"></span>
+                              <span class="photo"><img alt="avatar" src="../img/avatar-mini2.jpg"></span>
                                     <span class="subject">
                                     <span class="from">Jhon Doe</span>
                                     <span class="time">10 mins</span>
@@ -161,7 +160,7 @@
                       </li>
                       <li>
                           <a href="#">
-                              <span class="photo"><img alt="avatar" src="img/avatar-mini3.jpg"></span>
+                              <span class="photo"><img alt="avatar" src="../img/avatar-mini3.jpg"></span>
                                     <span class="subject">
                                     <span class="from">Jason Stathum</span>
                                     <span class="time">3 hrs</span>
@@ -173,7 +172,7 @@
                       </li>
                       <li>
                           <a href="#">
-                              <span class="photo"><img alt="avatar" src="img/avatar-mini4.jpg"></span>
+                              <span class="photo"><img alt="avatar" src="../img/avatar-mini4.jpg"></span>
                                     <span class="subject">
                                     <span class="from">Jondi Rose</span>
                                     <span class="time">Just now</span>
@@ -252,12 +251,11 @@
                   <!-- user login dropdown start-->
                   <li class="dropdown">
                       <a data-toggle="dropdown" class="dropdown-toggle" href="#">
-                          <img alt="" src="img/avatar1_small.jpg">
+                          <img alt="" src="../img/avatar1_small.jpg">
                           <span class="username">Jhon Doue</span>
                           <b class="caret"></b>
                       </a>
                       <ul class="dropdown-menu extended logout">
-                          <div class="log-arrow-up"></div>
                           <li><a href="#"><i class=" icon-suitcase"></i>Profile</a></li>
                           <li><a href="#"><i class="icon-cog"></i> Settings</a></li>
                           <li><a href="#"><i class="icon-bell-alt"></i> Notification</a></li>
@@ -294,7 +292,7 @@
                           <li><a class="" href="font_awesome.html">Font Awesome</a></li>
                       </ul>
                   </li>
-                  <li class="sub-menu active">
+                  <li class="sub-menu">
                       <a href="javascript:;" class="">
                           <i class="icon-cogs"></i>
                           <span>Components</span>
@@ -302,7 +300,7 @@
                       </a>
                       <ul class="sub">
                           <li><a class="" href="grids.html">Grids</a></li>
-                          <li class="active"><a class="" href="calendar.html">Calendar</a></li>
+                          <li><a class="" href="calendar.html">Calendar</a></li>
                           <li><a class="" href="charts.html">Charts</a></li>
                       </ul>
                   </li>
@@ -336,7 +334,7 @@
                           <span class="label label-danger pull-left mail-info">2</span>
                       </a>
                   </li>
-                  <li class="sub-menu">
+                  <li class="sub-menu active">
                       <a href="javascript:;" class="">
                           <i class="icon-glass"></i>
                           <span>Extra</span>
@@ -344,7 +342,7 @@
                       </a>
                       <ul class="sub">
                           <li><a class="" href="blank.html">Blank Page</a></li>
-                          <li><a class="" href="profile.html">Profile</a></li>
+                          <li class="active"><a class="" href="profile.html">Profile</a></li>
                           <li><a class="" href="invoice.html">Invoice</a></li>
                           <li><a class="" href="404.html">404 Error</a></li>
                           <li><a class="" href="500.html">500 Error</a></li>
@@ -366,33 +364,144 @@
           <section class="wrapper">
               <!-- page start-->
               <div class="row">
-                  <aside class="col-lg-3">
-                      <h4 class="drg-event-title"> Draggable Events</h4>
-                      <div id='external-events'>
-                          <div class='external-event label label-primary'>My Event 1</div>
-                          <div class='external-event label label-success'>My Event 2</div>
-                          <div class='external-event label label-info'>My Event 3</div>
-                          <div class='external-event label label-inverse'>My Event 4</div>
-                          <div class='external-event label label-warning'>My Event 5</div>
-                          <div class='external-event label label-danger'>My Event 6</div>
-                          <div class='external-event label label-default'>My Event 7</div>
-                          <div class='external-event label label-primary'>My Event 8</div>
-                          <div class='external-event label label-info'>My Event 9</div>
-                          <div class='external-event label label-success'>My Event 10</div>
-                          <p class="border-top drp-rmv">
-                              <input type='checkbox' id='drop-remove' />
-                              remove after drop
-                          </p>
-                      </div>
-                  </aside>
-                  <aside class="col-lg-9">
+                  <aside class="profile-nav col-lg-3">
                       <section class="panel">
-                          <div class="panel-body">
-                              <div id="calendar" class="has-toolbar"></div>
+                          <div class="user-heading round">
+                              <a href="#">
+                                  <img src="../img/profile-avatar.jpg" alt="">
+                              </a>
+                              <h1>Jonathan Smith</h1>
+                              <p>jsmith@flatlab.com</p>
+                          </div>
+
+                          <ul class="nav nav-pills nav-stacked">
+                              <li class="active"><a href="profile.html"> <i class="icon-user"></i> Profile</a></li>
+                              <li><a href="profile-activity.html"> <i class="icon-calendar"></i> Recent Activity <span class="label label-danger pull-right r-activity">9</span></a></li>
+                              <li><a href="profile-edit.html"> <i class="icon-edit"></i> Edit profile</a></li>
+                          </ul>
+
+                      </section>
+                  </aside>
+                  <aside class="profile-info col-lg-9">
+                      <section class="panel">
+                          <form>
+                              <textarea placeholder="Whats in your mind today?" rows="2" class="form-control input-lg p-text-area"></textarea>
+                          </form>
+                          <footer class="panel-footer">
+                              <button class="btn btn-danger pull-right">Post</button>
+                              <ul class="nav nav-pills">
+                                  <li>
+                                      <a href="#"><i class="icon-map-marker"></i></a>
+                                  </li>
+                                  <li>
+                                      <a href="#"><i class="icon-camera"></i></a>
+                                  </li>
+                                  <li>
+                                      <a href="#"><i class=" icon-film"></i></a>
+                                  </li>
+                                  <li>
+                                      <a href="#"><i class="icon-microphone"></i></a>
+                                  </li>
+                              </ul>
+                          </footer>
+                      </section>
+                      <section class="panel">
+                          <div class="bio-graph-heading">
+                              Aliquam ac magna metus. Nam sed arcu non tellus fringilla fringilla ut vel ispum. Aliquam ac magna metus.
+                          </div>
+                          <div class="panel-body bio-graph-info">
+                              <h1>Bio Graph</h1>
+                              <div class="row">
+                                  <div class="bio-row">
+                                      <p><span>First Name </span>: Jonathan</p>
+                                  </div>
+                                  <div class="bio-row">
+                                      <p><span>Last Name </span>: Smith</p>
+                                  </div>
+                                  <div class="bio-row">
+                                      <p><span>Country </span>: Australia</p>
+                                  </div>
+                                  <div class="bio-row">
+                                      <p><span>Birthday</span>: 13 July 1983</p>
+                                  </div>
+                                  <div class="bio-row">
+                                      <p><span>Occupation </span>: UI Designer</p>
+                                  </div>
+                                  <div class="bio-row">
+                                      <p><span>Email </span>: jsmith@flatlab.com</p>
+                                  </div>
+                                  <div class="bio-row">
+                                      <p><span>Mobile </span>: (12) 03 4567890</p>
+                                  </div>
+                                  <div class="bio-row">
+                                      <p><span>Phone </span>: 88 (02) 123456</p>
+                                  </div>
+                              </div>
+                          </div>
+                      </section>
+                      <section>
+                          <div class="row">
+                              <div class="col-lg-6">
+                                  <div class="panel">
+                                      <div class="panel-body">
+                                          <div class="bio-chart">
+                                              <input class="knob" data-width="100" data-height="100" data-displayPrevious=true  data-thickness=".2" value="35" data-fgColor="#e06b7d" data-bgColor="#e8e8e8">
+                                          </div>
+                                          <div class="bio-desk">
+                                              <h4 class="red">Envato Website</h4>
+                                              <p>Started : 15 July</p>
+                                              <p>Deadline : 15 August</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div class="col-lg-6">
+                                  <div class="panel">
+                                      <div class="panel-body">
+                                          <div class="bio-chart">
+                                              <input class="knob" data-width="100" data-height="100" data-displayPrevious=true  data-thickness=".2" value="63" data-fgColor="#4CC5CD" data-bgColor="#e8e8e8">
+                                          </div>
+                                          <div class="bio-desk">
+                                              <h4 class="terques">ThemeForest CMS </h4>
+                                              <p>Started : 15 July</p>
+                                              <p>Deadline : 15 August</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div class="col-lg-6">
+                                  <div class="panel">
+                                      <div class="panel-body">
+                                          <div class="bio-chart">
+                                              <input class="knob" data-width="100" data-height="100" data-displayPrevious=true  data-thickness=".2" value="75" data-fgColor="#96be4b" data-bgColor="#e8e8e8">
+                                          </div>
+                                          <div class="bio-desk">
+                                              <h4 class="green">VectorLab Portfolio</h4>
+                                              <p>Started : 15 July</p>
+                                              <p>Deadline : 15 August</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div class="col-lg-6">
+                                  <div class="panel">
+                                      <div class="panel-body">
+                                          <div class="bio-chart">
+                                              <input class="knob" data-width="100" data-height="100" data-displayPrevious=true  data-thickness=".2" value="50" data-fgColor="#cba4db" data-bgColor="#e8e8e8">
+                                          </div>
+                                          <div class="bio-desk">
+                                              <h4 class="purple">Adobe Muse Template</h4>
+                                              <p>Started : 15 July</p>
+                                              <p>Deadline : 15 August</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
                           </div>
                       </section>
                   </aside>
               </div>
+
               <!-- page end-->
           </section>
       </section>
@@ -400,18 +509,22 @@
   </section>
 
     <!-- js placed at the end of the document so the pages load faster -->
-    <script src="js/jquery.js"></script>
-  <script type="text/javascript" src="js/jquery-ui-1.9.2.custom.min.js"></script>
-  <script src="assets/fullcalendar/fullcalendar/fullcalendar.min.js"></script>
-  <script src="js/bootstrap.min.js"></script>
-  <script src="js/jquery.scrollTo.min.js"></script>
-  <script src="js/jquery.nicescroll.js" type="text/javascript"></script>
+    <script src="../js/jquery.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/jquery.scrollTo.min.js"></script>
+    <script src="../js/jquery.nicescroll.js" type="text/javascript"></script>
+    <script src="../assets/jquery-knob/js/jquery.knob.js"></script>
 
     <!--common script for all pages-->
-    <script src="js/common-scripts.js"></script>
+    <script src="../js/common-scripts.js"></script>
 
-    <!--script for this page only-->
-    <script src="js/external-dragging-calendar.js"></script>
+  <script>
+
+      //knob
+      $(".knob").knob();
+
+  </script>
+
 
   </body>
 </html>
