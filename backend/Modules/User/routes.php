@@ -8,14 +8,29 @@ use Modules\User\Http\Controllers\UserController;
 use Modules\User\Http\Controllers\AuthController;
 
 
-Route::prefix('dashboard')->group(function () {
+Route::prefix('dashboard')->name('dashboard.')->group(function () {
+
+    Route::get('register', [AuthController::class, 'registerForm'])->name('register.form');
     Route::post('register', [AuthController::class, 'register'])->name('register');
-    Route::post('register', [AuthController::class, 'registerpost'])->name('registerpost');
-    Route::get('login', [AuthController::class, 'login'])->name('login');
-    Route::post('login', [AuthController::class, 'loginpost'])->name('loginpost');
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::get('login', [AuthController::class, 'loginForm'])->name('login.form');
+    Route::post('login', [AuthController::class, 'login'])->name('login');
+
+    Route::get('forgot-password', [AuthController::class, 'forgotPasswordForm'])->name('password.request');
+    Route::post('forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
+
+    Route::get('reset-password/{token}', [AuthController::class, 'resetPasswordForm'])->name('password.reset');
+    Route::post('reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+
+    Route::middleware('auth')->group(function () {
+
+        Route::get('/', function () {
+            return view('dashboard.index');
+        })->name('home');
+
         Route::get('me', [AuthController::class, 'me'])->name('me');
+
+        Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     });
 });
 
