@@ -1,64 +1,156 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa">
 
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="">
-    <meta name="author" content="Mosaddek">
-    <meta name="keyword" content="FlatLab, Dashboard, Bootstrap, Admin, Template, Theme, Responsive, Fluid, Retina">
-    <link rel="shortcut icon" href="/dashboard/img/favicon.html">
+    <title>ورود / ثبت نام</title>
+    <link href="/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <style>
+        body,
+        html {
+            height: 100%;
+            margin: 0;
+        }
 
-    <title>FlatLab - Flat & Responsive Bootstrap Admin Template</title>
+        .video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
 
-    <!-- Bootstrap core CSS -->
-    <link href="/dashboard/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/dashboard/css/bootstrap-reset.css" rel="stylesheet">
-    <!--external css-->
-    <link href="/dashboard/assets/font-awesome/css/font-awesome.css" rel="stylesheet" />
-    <!-- Custom styles for this template -->
-    <link href="/dashboard/css/style.css" rel="stylesheet">
-    <link href="/dashboard/css/style-responsive.css" rel="stylesheet" />
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
 
-    <!-- HTML5 shim and Respond.js IE8 support of HTML5 tooltipss and media queries -->
-    <!--[if lt IE 9]>
-    <script src="/dashboard/js/html5shiv.js"></script>
-    <script src="/dashboard/js/respond.min.js"></script>
-    <![endif]-->
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0066fb26;
+        }
+
+        .auth-container {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 30%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex-wrap: nowrap;
+            background-color: #f8f9fa;
+            box-shadow: -5px 0px 20px 20px #f8f9fa;
+            opacity: .9;
+        }
+
+        .form-toggle {
+            margin-bottom: 1rem;
+            text-align: center;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .form-toggle button {
+            margin: 0 0.2rem;
+        }
+    </style>
 </head>
 
-<body class="login-body">
+<body>
 
-    <div class="container">
-
-        <form class="form-signin" action="index.html">
-            <h2 class="form-signin-heading">sign in now</h2>
-            <div class="login-wrap">
-                <input type="text" class="form-control" placeholder="User ID" autofocus>
-                <input type="password" class="form-control" placeholder="Password">
-                <label class="checkbox">
-                    <input type="checkbox" value="remember-me"> Remember me
-                    <span class="pull-right"> <a href="#"> Forgot Password?</a></span>
-                </label>
-                <button class="btn btn-lg btn-login btn-block" type="submit">Sign in</button>
-                <p>or you can sign in via social network</p>
-                <div class="login-social-link">
-                    <a href="index.html" class="facebook">
-                        <i class="icon-facebook"></i>
-                        Facebook
-                    </a>
-                    <a href="index.html" class="twitter">
-                        <i class="icon-twitter"></i>
-                        Twitter
-                    </a>
-                </div>
-
-            </div>
-
-        </form>
-
+    <div class="video-container">
+        <video autoplay muted loop>
+            <source src="/src/People_Person.mp4" type="video/mp4">
+            مرورگر شما ویدیو را پشتیبانی نمی‌کند.
+        </video>
+        <div class="overlay"></div>
     </div>
 
+    <div class="auth-container" dir="rtl">
+        <div class="auth-box ps-3">
+
+
+            <!-- Login Form -->
+            <form id="login-form" action="{{ route('dashboard.login') }}" method="POST">
+                @csrf
+                <div class="mb-3">
+                    <label for="mobile" class="form-label">شماره موبایل</label>
+                    <input type="text" class="form-control" id="mobile" name="mobile" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">رمز عبور</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                    <label class="form-check-label" for="remember">مرا به خاطر بسپار</label>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">ورود</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" action="{{ route('dashboard.register') }}" method="POST" style="display:none;">
+                @csrf
+                <div class="mb-3">
+                    <label for="name" class="form-label">نام</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="mobile-register" class="form-label">شماره موبایل</label>
+                    <input type="text" class="form-control" id="mobile-register" name="mobile" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password-register" class="form-label">رمز عبور</label>
+                    <input type="password" class="form-control" id="password-register" name="password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password-confirm" class="form-label">تکرار رمز عبور</label>
+                    <input type="password" class="form-control" id="password-confirm" name="password_confirmation" required>
+                </div>
+                <button type="submit" class="btn btn-success w-100">ثبت نام</button>
+            </form>
+
+            <!-- Forgot Password Form -->
+            <form id="forgot-form" action="{{ route('dashboard.forgotPassword') }}" method="POST" style="display:none;">
+                @csrf
+                <div class="mb-3">
+                    <label for="mobile-forgot" class="form-label">شماره موبایل</label>
+                    <input type="text" class="form-control" id="mobile-forgot" name="mobile" required>
+                </div>
+                <button type="submit" class="btn btn-warning w-100">ارسال لینک بازیابی</button>
+            </form>
+
+
+
+            <div class="form-toggle">
+                <button class="btn btn-outline-primary btn-sm" onclick="showForm('login')">ورود</button>
+                <button class="btn btn-outline-success btn-sm" onclick="showForm('register')">ثبت نام</button>
+                <button class="btn btn-outline-warning btn-sm" onclick="showForm('forgot')">فراموشی رمز</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showForm(form) {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('forgot-form').style.display = 'none';
+
+            if (form === 'login') document.getElementById('login-form').style.display = 'block';
+            if (form === 'register') document.getElementById('register-form').style.display = 'block';
+            if (form === 'forgot') document.getElementById('forgot-form').style.display = 'block';
+        }
+    </script>
 
 </body>
 
