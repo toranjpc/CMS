@@ -23,9 +23,6 @@ class User extends Authenticatable
         "alias",
         "username",
         "mobile",
-        // "mobile_verified_at",
-        "email",
-        // "email_verified_at",
         "password",
         "job",
         "per",
@@ -39,98 +36,56 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
         'mobile_verified_at' => 'datetime',
         'per' => 'array',
         'datas' => 'array',
         'password' => 'hashed',
     ];
 
-    /*
-    public function Category()
+
+    public function jobOption()
     {
-        return $this->hasOne(UserOption::class, 'id', 'job')->select('id', 'title', 'option')->where("useroptions.kind", "UserCategory");
+        return $this->belongsTo(Option::class, 'job', 'id')
+            ->where('kind', 'job');
     }
 
-    public function Groups()
+    public function reagent()
     {
-        // return $this->belongsToMany(UserOption::class, 'extdatas', 'id', 'id')->select('useroptions.id', 'useroptions.title', 'useroptions.option')->wherePivot('kind', 'UserGroup')->where("useroptions.kind", "UserGroup");
-
-        return $this->belongsToMany(UserOption::class, 'extdatas', 'f_id', 'm_id')
-            ->withPivot('datas', 'kind')
-            ->wherePivot('kind', 'usergroup')
-            ->where("useroptions.kind", "UserGroup")
-            ->as('values');
+        return $this->belongsTo(User::class, 'f_id', 'id')
+            ->select('id', 'name', 'lastname', 'alias');
     }
 
+    public function category()
+    {
+        return $this->hasOne(ExtData::class, 'f_id', 'id')
+            // ->select('f_id', 'm_id')
+            ->where('kind', 'UserCategory')
+            ->with(['om' => function ($q) {
+                $q->where('options.kind', 'Category');
+            }]);
+    }
     public function userPlan()
     {
-        return $this->hasOne(ExtData::class, 'm_id', 'id')->select('f_id', 'm_id', 'datas', 'created_at')
-            ->where("extdatas.kind", "UserPlan")
-            ->where("extdatas.status", 1);
-            // ->with([
-            //     'UseroptionByFid' => function ($q) {
-            //         $q->select('id', 'title', 'option')
-            //             ->where("useroptions.kind", "UserPlan");
-            //     }
-            // ]);
+        return $this->hasOne(ExtData::class, 'f_id', 'id')
+            // ->select('f_id', 'm_id')
+            ->where('kind', 'UserPlan')
+            ->where('status', 1)
+            ->latest('id')
+            ->with(['om' => function ($q) {
+                $q->where('options.kind', 'Plan');
+            }]);
+    }
+    public function userPlans()
+    {
+        return $this->belongsToMany(Option::class, 'extdatas', 'f_id', 'm_id')
+            ->withPivot('datas', 'kind')
+            ->wherePivot('kind', 'UserPlan')
+            ->where('options.kind', 'Plan');
     }
 
-    public function Reagent()
+    public function extraData()
     {
-        return $this->hasOne(User::class, 'id', 'f_id')->select('id', 'name', 'lastname', 'alias');
+        return $this->hasMany(ExtData::class, 'f_id', 'id')
+            ->where('kind', 'Data');
     }
-
-    public function UserGroup()
-    {
-        return $this->hasOne(UserOption::class, 'id', 'job')->select('id', 'title')->where("useroptions.kind", "User_group");
-    }
-    public function UserGroupForm()
-    {
-        return $this->hasOne(UserOption::class, 'id', 'job')->select('id', 'option')->where("useroptions.kind", "User_group");
-    }
-    public function UserGroupPer()
-    {
-        return $this->hasOne(UserOption::class, 'id', 'job')->select('id', 'option')->where("useroptions.kind", "User_group");
-    }
-    public function ExtData()
-    {
-        return $this->hasMany(ExtData::class, 'f_id', 'id')->select('f_id', 'm_id', 'data')->where("extdatas.kind", "User")->with('usercategory');
-    }
-    public function Extdata2()
-    {
-        return $this->hasMany(ExtData::class, 'f_id', 'id')->select('f_id', 'm_id', 'data')->where("extdatas.kind", "User");
-    }
-    public function ExtdataTitle()
-    {
-        return $this->hasMany(ExtData::class, 'f_id', 'id')->select('id', 'f_id', 'm_id')->where("extdatas.kind", "User"); //->with('usercategoryTitle');
-    }
-
-    public function store()
-    {
-        return $this->hasOne(UserOption::class, 'f_id', 'id')->select('id', 'f_id', 'title as url', 'option->title as title', 'option', 'status')->where("useroptions.kind", "like", "store");
-    }
-    public function storeTitle()
-    {
-        return $this->hasOne(UserOption::class, 'f_id', 'id')->select('f_id', 'title as url', 'option->title as title')->where("useroptions.kind", "like", "store"); //->where("useroptions.status", "!=", 0)
-    }
-
-    // public function NewOrders()
-    // {
-    //     return $this->hasMany(Order::class, 'm_id', 'id')->selectRaw('id , m_id , p_id , a_id , price , send_price , num , (price*num) as tinysum , sum')->with('product')->where("status", 0);
-    // }
-    // public function extAddressList()
-    // {
-    //     return $this->hasMany(UserOption::class, 'f_id', 'id')->select('id', 'title', 'option')->where("useroptions.kind", "Address")->where("status", '>', 0);
-    // }
-
-    // public function lastQuiz()
-    // {
-    //     return $QS = $data = $this->hasOne(ExtData::class, 'm_id', 'id')->selectRaw('SUM(json_extract(`data`, "$.correctD")*json_extract(`data`, "$.quiezScore"))/SUM(json_extract(`data`, "$.quiezScore")) as `correctD`')->where('data->endQuiz', 1)->where('kind', 'quizAns');
-    // }
-    // public function lastQuizTit()
-    // {
-    //     return $QS = $data = $this->hasMany(ExtData::class, 'm_id', 'id')->select('f_id', 'm_id')->where('data->endQuiz', 1)->where('kind', 'quizAns'); //->with('quize:id,f_id,title');
-    // }
-    */
 }

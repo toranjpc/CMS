@@ -13,6 +13,7 @@ class ExtData extends Model
     protected $fillable = [
         'f_id',
         'm_id',
+        's_id',
         'title',
         'kind',
         'datas',
@@ -24,37 +25,31 @@ class ExtData extends Model
         'datas' => 'array',
     ];
 
-
-    public function user()
+    //get user data
+    public function uf()
     {
-        return $this->hasOne(User::class, 'id', 'f_id')->select('id', 'name', 'lastname', 'alias', 'job');
+        return $this->belongsTo(User::class, 'f_id', 'id');
     }
-    public function member()
+    public function um()
     {
-        return $this->hasOne(User::class, 'id', 'm_id')->select('id', 'name', 'lastname', 'alias', 'job');
+        return $this->belongsTo(User::class, 'm_id', 'id');
     }
-    public function UseroptionByFid()
+    public function us()
     {
-        return $this->hasOne(UserOption::class, 'id', 'f_id');
-    }
-
-
-    public function fids()
-    {
-        return $this->hasMany(ExtData::class, 'id', 'f_id');
-    }
-    public function mids()
-    {
-        return $this->hasMany(ExtData::class, 'id', 'm_id');
-    }
-    public function sids()
-    {
-        return $this->hasMany(ExtData::class, 's_id', 'id')->orderBy('id', 'DESC');
+        return $this->belongsTo(User::class, 's_id', 'id');
     }
 
-    public function followup()
+    //get option data
+    public function of()
     {
-        return $this->hasMany(ExtData::class, 's_id', 's_id');
-        // ->orderBy('updated_at', 'DESC');
+        return $this->belongsTo(Option::class, 'f_id', 'id');
+    }
+    public function om()
+    {
+        return $this->belongsTo(Option::class, 'm_id', 'id');
+    }
+    public function os()
+    {
+        return $this->belongsTo(Option::class, 's_id', 'id');
     }
 }

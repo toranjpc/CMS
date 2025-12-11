@@ -13,26 +13,50 @@ class UserSeeder extends Seeder
 
     public function run()
     {
-        DB::table('useroptions')->insert([
+        DB::table('options')->insert([
             [
                 'title' => 'ادمین کل',
-                'kind' => 'UserCategory',
-                'option' => json_encode(["form" => null, "permissions" => null]),
+                'kind' => 'job',
+                'option' => json_encode(["form" => null, "permissions" => ["*"]]),
                 'status' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
                 'title' => 'کاربر عادی',
-                'kind' => 'UserCategory',
-                'option' => json_encode(["form" => null, "permissions" => null]),
+                'kind' => 'job',
+                'option' => json_encode(["form" => null, "permissions" => []]),
                 'status' => 0,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
                 'title' => 'خریدار نوع 1',
-                'kind' => 'UserGroup',
+                'kind' => 'Category',
+                'option' => json_encode(["form" => null]),
+                'status' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'title' => 'اشتراک طلایی',
+                'kind' => 'Plan',
+                'option' => json_encode(["form" => null]),
+                'status' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'title' => 'اشتراک نقره ای',
+                'kind' => 'Plan',
+                'option' => json_encode(["form" => null]),
+                'status' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'title' => 'اشتراک برنزی',
+                'kind' => 'Plan',
                 'option' => json_encode(["form" => null]),
                 'status' => 1,
                 'created_at' => now(),
@@ -50,6 +74,7 @@ class UserSeeder extends Seeder
                 'mobile' => "09120703611",
                 'sex' => 1,
                 'job' => 1,
+                'per' => json_encode(["*"]),
                 'status' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),

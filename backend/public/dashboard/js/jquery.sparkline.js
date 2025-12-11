@@ -942,9 +942,9 @@
     $(initStyles);
 
     pending = [];
-    $.fn.sparkline = function (userValues, userOptions) {
+    $.fn.sparkline = function (userValues, options) {
         return this.each(function () {
-            var options = new $.fn.sparkline.options(this, userOptions),
+            var options = new $.fn.sparkline.options(this, options),
                  $this = $(this),
                  render, i;
             render = function () {
@@ -1050,22 +1050,22 @@
      * User option handler
      */
     $.fn.sparkline.options = createClass({
-        init: function (tag, userOptions) {
+        init: function (tag, options) {
             var extendedOptions, defaults, base, tagOptionType;
-            this.userOptions = userOptions = userOptions || {};
+            this.options = options = options || {};
             this.tag = tag;
             this.tagValCache = {};
             defaults = $.fn.sparkline.defaults;
             base = defaults.common;
-            this.tagOptionsPrefix = userOptions.enableTagOptions && (userOptions.tagOptionsPrefix || base.tagOptionsPrefix);
+            this.tagOptionsPrefix = options.enableTagOptions && (options.tagOptionsPrefix || base.tagOptionsPrefix);
 
             tagOptionType = this.getTagSetting('type');
             if (tagOptionType === UNSET_OPTION) {
-                extendedOptions = defaults[userOptions.type || base.type];
+                extendedOptions = defaults[options.type || base.type];
             } else {
                 extendedOptions = defaults[tagOptionType];
             }
-            this.mergedOptions = $.extend({}, base, extendedOptions, userOptions);
+            this.mergedOptions = $.extend({}, base, extendedOptions, options);
         },
 
 

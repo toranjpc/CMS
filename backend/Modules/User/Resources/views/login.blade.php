@@ -70,7 +70,7 @@
 
     <div class="video-container">
         <video autoplay muted loop>
-            <source src="/src/People_Person.mp4" type="video/mp4">
+            <source src="/src/istockphoto-1828184731-640_adpp_is.mp4" type="video/mp4">
             مرورگر شما ویدیو را پشتیبانی نمی‌کند.
         </video>
         <div class="overlay"></div>
