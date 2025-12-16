@@ -5,135 +5,116 @@ namespace Modules\User\Http\Controllers;
 use Modules\User\Models\User;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    public function registerForm()
-    {
-        return view('user::register');
-    }
-
     public function register(Request $request)
     {
-        $request->validate([
-            'name'   => ['required', 'string', 'max:255'],
-            'mobile' => ['required', 'digits_between:10,15', 'unique:users,mobile'],
+        $data = $request->validate([
+            'name'     => ['required', 'string', 'max:255'],
+            'mobile'   => ['required', 'digits_between:10,15', 'unique:users,mobile'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
         ]);
 
         $user = User::create([
-            'name'     => $request->name,
-            'mobile'   => $request->mobile,
-            'password' => Hash::make($request->password),
+            'name'     => $data['name'],
+            'mobile'   => $data['mobile'],
+            'password' => Hash::make($data['password']),
         ]);
 
-        Auth::login($user);
+        $token = $user->createToken('auth')->plainTextToken;
 
-        return redirect()->route('dashboard.home');
-    }
-
-    public function loginForm()
-    {
-        return view('user::login');
+        return response()->json([
+            'status' => true,
+            'user'   => $user,
+            'token'  => $token,
+        ], 201);
     }
 
     public function login(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'mobile'   => ['required', 'digits_between:10,15'],
             'password' => ['required', 'string'],
         ]);
 
-        $key = $request->ip();
+        $key = $request->ip().'|'.$data['mobile'];
 
         if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
-            return back()->withErrors([
-                'mobile' => "تعداد تلاش‌های ورود زیاد بوده. لطفاً بعد از {$seconds} ثانیه دوباره امتحان کنید."
-            ])->onlyInput('mobile');
+            return response()->json([
+                'status'  => false,
+                'message' => 'تعداد تلاش‌های ورود زیاد است.',
+                'retry_in'=> RateLimiter::availableIn($key),
+            ], 429);
         }
 
-        $credentials = $request->only('mobile', 'password');
+        $user = User::where('mobile', $data['mobile'])->first();
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            RateLimiter::clear($key);
-            $request->session()->regenerate();
-            return redirect()->intended(route('dashboard.home'));
+        if (!$user || !Hash::check($data['password'], $user->password)) {
+            RateLimiter::hit($key, 60);
+
+            return response()->json([
+                'status'  => false,
+                'message' => 'اطلاعات ورود اشتباه است.',
+            ], 401);
         }
 
-        RateLimiter::hit($key, 60);
+        RateLimiter::clear($key);
 
-        return back()->withErrors([
-            'mobile' => 'اطلاعات ورود اشتباه است.',
-        ])->onlyInput('mobile');
+        $token = $user->createToken('auth')->plainTextToken;
+
+        return response()->json([
+            'status' => true,
+            'user'   => $user,
+            'token'  => $token,
+        ]);
     }
 
-    public function me()
+    public function me(Request $request)
     {
-        return view('dashboard.me', [
-            'user' => auth()->user()
+        return response()->json([
+            'status' => true,
+            'user'   => $request->user(),
         ]);
     }
 
     public function logout(Request $request)
     {
-        Auth::logout();
+        $request->user()->currentAccessToken()->delete();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('dashboard.login.form');
-    }
-
-    public function forgotPasswordForm()
-    {
-        return view('user::forgot-password');
-    }
-
-    public function sendResetLink(Request $request)
-    {
-        $request->validate([
-            'mobile' => ['required', 'digits_between:10,15'],
-        ]);
-
-        // اگر از SMS برای ریست رمز استفاده می‌کنید، این قسمت باید با سرویس پیامک جایگزین بشه
-        return back()->with('status', 'لینک بازیابی رمز به شماره شما ارسال شد (پیاده‌سازی SMS نیاز دارد).');
-    }
-
-    public function resetPasswordForm(string $token)
-    {
-        return view('user::reset-password', [
-            'token' => $token
+        return response()->json([
+            'status'  => true,
+            'message' => 'با موفقیت خارج شدید.',
         ]);
     }
 
     public function resetPassword(Request $request)
     {
-        $request->validate([
-            'token'    => ['required'],
+        $data = $request->validate([
             'mobile'   => ['required', 'digits_between:10,15'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
         ]);
 
-        // ریست رمز بدون ایمیل نیازمند پیاده‌سازی custom است
-        $user = User::where('mobile', $request->mobile)->first();
+        $user = User::where('mobile', $data['mobile'])->first();
+
         if (!$user) {
-            return back()->withErrors(['mobile' => 'شماره موبایل یافت نشد.']);
+            return response()->json([
+                'status'  => false,
+                'message' => 'کاربر یافت نشد.',
+            ], 404);
         }
 
-        $user->forceFill([
-            'password' => Hash::make($request->password),
+        $user->update([
+            'password' => Hash::make($data['password']),
             'remember_token' => Str::random(60),
-        ])->save();
+        ]);
 
-        event(new PasswordReset($user));
-
-        return redirect()->route('dashboard.login.form')->with('status', 'رمز عبور با موفقیت تغییر کرد.');
+        return response()->json([
+            'status'  => true,
+            'message' => 'رمز عبور با موفقیت تغییر کرد.',
+        ]);
     }
 }

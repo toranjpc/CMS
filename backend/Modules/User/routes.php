@@ -8,27 +8,20 @@ use Modules\User\Http\Controllers\UserController;
 use Modules\User\Http\Controllers\AuthController;
 
 
-Route::prefix('dashboard')->name('dashboard.')->group(function () {
-
-    Route::get('register', [AuthController::class, 'registerForm'])->name('register.form');
+Route::prefix('auth')->middleware('api')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->name('register');
-
-    Route::get('login', [AuthController::class, 'loginForm'])->name('login.form');
+    Route::get('login', function () {
+        return response()->json(['message' => 'login'], 200);
+    })->name('login');
     Route::post('login', [AuthController::class, 'login'])->name('login');
-
-    Route::get('forgot-password', [AuthController::class, 'forgotPasswordForm'])->name('forgotPassword.form');
-    Route::post('forgot-password', [AuthController::class, 'sendResetLink'])->name('forgotPassword');
-
-    Route::get('reset-password/{token}', [AuthController::class, 'resetPasswordForm'])->name('resetPassword.form');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->name('resetPassword');
 
-    Route::middleware('auth')->group(function () {
-
+    Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me'])->name('me');
-
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     });
 });
+
 
 
 Route::prefix('users')->middleware('auth:sanctum')->group(function () {

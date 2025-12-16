@@ -1,75 +1,276 @@
-# Nuxt Minimal Starter
+# پنل مدیریت محتوا (CMS Panel)
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+پنل مدیریت محتوای ساخته شده با Nuxt 4 برای هاست اشتراکی
 
-## Setup
+## 🚀 ویژگی‌های اصلی
 
-Make sure to install dependencies:
+- **حالت SPA**: بدون SSR برای هاست اشتراکی
+- **طراحی ریسپانسیو**: سازگار با Bootstrap 5
+- **مدیریت کاربران**: سیستم کامل ورود و ثبت نام
+- **داشبورد مدیریت**: آمار و اطلاعات سیستم
+- **API آماده**: اتصال به `http://pet.na/`
+
+## 📋 پیش‌نیازها
+
+- Node.js 18+
+- npm یا yarn یا pnpm
+
+## 🛠️ نصب و راه‌اندازی
+
+### 1. کلون کردن پروژه
 
 ```bash
-# npm
+git clone <repository-url>
+cd cms-panel
+```
+
+### 2. نصب وابستگی‌ها
+
+```bash
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
 ```
 
-## Development Server
+### 3. راه‌اندازی فایل Bootstrap
 
-Start the development server on `http://localhost:3000`:
+فایل Bootstrap RTL شخصی‌سازی شده خود را در مسیر زیر قرار دهید:
+
+```
+assets/css/bootstrap.rtl.min.css
+```
+
+**نکته مهم**:
+- فایل باید شامل کدهای CSS کامل Bootstrap RTL باشد
+- اگر فایل وجود ندارد، سرور با خطا مواجه می‌شود
+- می‌توانید فایل را از CDN کپی کرده یا فایل محلی خود را استفاده کنید
+
+**مثال**: اگر از CDN استفاده می‌کنید، محتویات فایل را کپی کرده و در فایل بالا قرار دهید.
+
+## 🚀 اجرای پروژه
+
+### حالت توسعه
 
 ```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+پروژه روی `http://localhost:3000` اجرا خواهد شد.
 
-Build the application for production:
+### ساخت برای تولید (هاست اشتراکی)
 
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+npm run generate
 ```
 
-Locally preview production build:
+فایل‌های استاتیک در پوشه `dist` ایجاد می‌شوند.
+
+### پیش‌نمایش ساخت تولید
 
 ```bash
-# npm
 npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## 📁 ساختار پروژه
+
+```
+cms-panel/
+├── app/
+│   └── app.vue                 # فایل اصلی اپلیکیشن
+├── layouts/
+│   └── default.vue             # لایوت اصلی با منوی ناوبری
+├── pages/
+│   ├── index.vue              # صفحه اصلی
+│   ├── login.vue              # صفحه ورود
+│   ├── register.vue           # صفحه ثبت نام
+│   ├── dashboard.vue          # داشبورد مدیریت
+│   └── users.vue              # مدیریت کاربران
+├── assets/
+│   └── css/
+│       └── bootstrap.rtl.min.css # فایل Bootstrap شما
+├── public/
+│   ├── favicon.ico
+│   └── robots.txt
+├── nuxt.config.ts             # تنظیمات Nuxt
+├── package.json
+└── README.md
+```
+
+## 🎨 صفحات و مسیرها
+
+| مسیر | صفحه | توضیح |
+|------|------|-------|
+| `/` | خانه | صفحه اصلی با محتوای نمونه |
+| `/login` | ورود | فرم ورود به سیستم |
+| `/register` | ثبت نام | فرم ثبت نام کاربر جدید |
+| `/dashboard` | داشبورد | پنل مدیریت با آمار |
+| `/users` | کاربران | مدیریت کاربران سیستم |
+
+## ⚙️ تنظیمات
+
+### تنظیمات Nuxt (`nuxt.config.ts`)
+
+```typescript
+export default defineNuxtConfig({
+  compatibilityDate: '2025-07-15',
+  devtools: { enabled: true },
+  ssr: false, // حالت SPA برای هاست اشتراکی
+  css: [
+    '~/assets/css/bootstrap.rtl.min.css'
+  ],
+  runtimeConfig: {
+    public: {
+      apiBase: 'http://pet.na/' // آدرس API
+    }
+  }
+})
+```
+
+### تنظیمات API
+
+API Base URL در `nuxt.config.ts` تنظیم شده است. برای تغییر آدرس API:
+
+```typescript
+runtimeConfig: {
+  public: {
+    apiBase: 'http://your-api-domain.com/'
+  }
+}
+```
+
+## 🔧 استفاده از API
+
+### نمونه استفاده در کامپوننت‌ها
+
+```vue
+<script setup>
+const config = useRuntimeConfig()
+
+const loginUser = async () => {
+  try {
+    const response = await $fetch(`${config.public.apiBase}api/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: 'user@example.com',
+        password: 'password123'
+      })
+    })
+
+    if (response.success) {
+      // ذخیره توکن و هدایت به داشبورد
+      localStorage.setItem('token', response.token)
+      await navigateTo('/dashboard')
+    }
+  } catch (error) {
+    console.error('خطا در ورود:', error)
+  }
+}
+</script>
+```
+
+## 🎨 سفارشی‌سازی
+
+### تغییر استایل‌ها
+
+فایل‌های CSS سفارشی را در `assets/css/` قرار دهید و در `nuxt.config.ts` اضافه کنید:
+
+```typescript
+css: [
+  '~/assets/css/bootstrap.rtl.min.css',
+  '~/assets/css/custom-styles.css'
+]
+```
+
+### افزودن صفحات جدید
+
+صفحات جدید را در پوشه `pages/` ایجاد کنید. Nuxt به طور خودکار مسیرها را ایجاد می‌کند.
+
+مثال: `pages/about.vue` → مسیر `/about`
+
+### تغییر لایوت
+
+برای تغییر لایوت پیش‌فرض، فایل `layouts/default.vue` را ویرایش کنید یا لایوت‌های جدید ایجاد کنید.
+
+## 🚀 استقرار
+
+### هاست اشتراکی
+
+1. پروژه را بسازید:
+   ```bash
+   npm run generate
+   ```
+
+2. محتویات پوشه `dist` را روی هاست خود آپلود کنید.
+
+### سرور اختصاصی
+
+برای سرور اختصاصی، می‌توانید از حالت SSR استفاده کنید:
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  ssr: true, // فعال کردن SSR
+  // ... سایر تنظیمات
+})
+```
+
+## 📊 اطلاعات آزمایشی
+
+### اطلاعات ورود آزمایشی
+
+- **ایمیل**: admin@example.com
+- **رمز عبور**: password123
+
+## 🐛 عیب‌یابی
+
+### مشکلات رایج
+
+1. **خطای CORS**: مطمئن شوید API شما CORS را فعال کرده باشد.
+
+2. **خطای 404**: مطمئن شوید فایل‌های استاتیک به درستی آپلود شده‌اند.
+
+3. **مشکل در Bootstrap**: مطمئن شوید فایل Bootstrap شما معتبر است.
+
+### لاگ‌ها
+
+برای مشاهده لاگ‌های توسعه:
+
+```bash
+npm run dev -- --log-level verbose
+```
+
+## 📝 توسعه بیشتر
+
+### افزودن قابلیت‌های جدید
+
+- **احراز هویت**: پیاده‌سازی JWT یا session-based auth
+- **پایگاه داده**: اتصال به MySQL، PostgreSQL یا MongoDB
+- **آپلود فایل**: سیستم آپلود تصویر و فایل
+- **نوتیفیکیشن**: سیستم اعلان‌ها و هشدارها
+
+### کتابخانه‌های پیشنهادی
+
+- **UI Components**: Nuxt UI، PrimeVue
+- **State Management**: Pinia
+- **HTTP Client**: Axios
+- **Forms**: VeeValidate
+- **Icons**: Bootstrap Icons یا Heroicons
+
+## 📄 مجوز
+
+این پروژه تحت مجوز MIT منتشر شده است.
+
+## 🤝 مشارکت
+
+برای مشارکت در توسعه این پروژه:
+
+1. Fork کنید
+2. Branch جدید ایجاد کنید (`git checkout -b feature/AmazingFeature`)
+3. تغییرات را commit کنید (`git commit -m 'Add some AmazingFeature'`)
+4. Push کنید (`git push origin feature/AmazingFeature`)
+5. Pull Request ایجاد کنید
+
+## 📞 پشتیبانی
+
+برای سوالات و پشتیبانی، لطفا issue جدید در GitHub ایجاد کنید.

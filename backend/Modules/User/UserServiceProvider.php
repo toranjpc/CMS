@@ -16,8 +16,35 @@ class UserServiceProvider extends ServiceProvider
     {
         //
     }
+
+    /**
+     * Configure authentication settings for API usage
+     */
+    protected function configureAuth(): void
+    {
+        // Override auth guards to ensure sanctum is available
+        config([
+            'auth.guards.sanctum' => [
+                'driver'   => 'sanctum',
+                'provider' => 'users',
+            ],
+        ]);
+
+        // Override user provider to use our custom User model
+        config([
+            'auth.providers.users.model' => \Modules\User\Models\User::class,
+        ]);
+
+        // Set default guard to sanctum for API requests
+        if (request()->is('api/*')) {
+            config(['auth.defaults.guard' => 'sanctum']);
+        }
+    }
     public function boot(): void
     {
+        // Override auth config for API authentication
+        $this->configureAuth();
+
         $this->loadRoutesFrom(__DIR__ . '/routes.php');
         $this->loadMigrationsFrom(__DIR__ . '/Database/migrations');
         // $this->loadFactoriesFrom(__DIR__ . '/Database/factories');
