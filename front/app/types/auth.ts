@@ -41,3 +41,4 @@ export interface ApiError {
   errors?: Record<string, string[]>
   status?: number
 }
+

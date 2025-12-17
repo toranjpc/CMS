@@ -14,16 +14,8 @@
                 <!-- Mobile Field -->
                 <div class="mb-3">
                   <label for="mobile" class="form-label">شماره موبایل</label>
-                  <input
-                    type="tel"
-                    class="form-control form-control-lg"
-                    id="mobile"
-                    v-model="form.mobile"
-                    placeholder="09123456789"
-                    pattern="^09[0-9]{9}$"
-                    maxlength="11"
-                    required
-                  />
+                  <input type="tel" class="form-control form-control-lg" id="mobile" v-model="form.mobile"
+                    placeholder="09123456789" pattern="^09[0-9]{9}$" maxlength="11" required />
                   <div class="form-text">
                     شماره موبایل باید با 09 شروع شود و 11 رقم باشد
                   </div>
@@ -32,15 +24,8 @@
                 <!-- Password Field -->
                 <div class="mb-3">
                   <label for="password" class="form-label">رمز عبور</label>
-                  <input
-                    type="password"
-                    class="form-control form-control-lg"
-                    id="password"
-                    v-model="form.password"
-                    placeholder="رمز عبور خود را وارد کنید"
-                    minlength="8"
-                    required
-                  />
+                  <input type="password" class="form-control form-control-lg" id="password" v-model="form.password"
+                    placeholder="رمز عبور خود را وارد کنید" minlength="8" required />
                   <div class="form-text">
                     رمز عبور باید حداقل 8 کاراکتر باشد
                   </div>
@@ -56,11 +41,7 @@
 
                 <!-- Submit Button -->
                 <div class="d-grid mb-3">
-                  <button
-                    type="submit"
-                    class="btn btn-primary btn-lg"
-                    :disabled="authStore.loading || loading"
-                  >
+                  <button type="submit" class="btn btn-primary btn-lg" :disabled="authStore.loading || loading">
                     <span v-if="authStore.loading || loading" class="spinner-border spinner-border-sm me-2"></span>
                     {{ (authStore.loading || loading) ? 'در حال ورود...' : 'ورود' }}
                   </button>
@@ -99,10 +80,10 @@
                 اطلاعات آزمایشی
               </h6>
               <p class="card-text small mb-1">
-                <strong>موبایل:</strong> 09123456789
+                <strong>موبایل:</strong> {{ testdata.mobile }}
               </p>
               <p class="card-text small mb-0">
-                <strong>رمز عبور:</strong> password123
+                <strong>رمز عبور:</strong> {{ testdata.pass }}
               </p>
             </div>
           </div>
@@ -207,6 +188,31 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+
+
+const testdata = reactive({
+  mobile: '',
+  pass: '',
+})
+const config = useRuntimeConfig()
+onMounted(async () => {
+
+
+  const res = await $fetch(config.public.apiBase, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json'
+    },
+    body: {
+
+    }
+  })
+  console.log(res)
+
+})
+
+
 
 // Clear messages when form changes
 watch(() => [form.mobile, form.password], () => {

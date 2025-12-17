@@ -6,3 +6,4 @@ export default defineNuxtPlugin(() => {
 
   console.log('🔒 Security measures initialized')
 })
+

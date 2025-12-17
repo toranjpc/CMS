@@ -22,3 +22,4 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
 
   console.log('👤 User not authenticated, allowing access to guest route')
 })
+

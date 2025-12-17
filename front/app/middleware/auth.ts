@@ -37,3 +37,4 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     return navigateTo('/login', { replace: true })
   }
 })
+
