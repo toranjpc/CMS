@@ -41,9 +41,9 @@
 
                 <!-- Submit Button -->
                 <div class="d-grid mb-3">
-                  <button type="submit" class="btn btn-primary btn-lg" :disabled="authStore.loading || loading">
-                    <span v-if="authStore.loading || loading" class="spinner-border spinner-border-sm me-2"></span>
-                    {{ (authStore.loading || loading) ? 'در حال ورود...' : 'ورود' }}
+                  <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
+                    <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                    {{ (loading) ? 'در حال ورود...' : 'ورود' }}
                   </button>
                 </div>
 
@@ -98,6 +98,7 @@ import { validateMobile, loginRateLimiter } from '~/utils/security'
 
 const authStore = useAuth()
 const router = useRouter()
+console.log(authStore)
 
 // Form data
 const form = reactive({
@@ -199,15 +200,16 @@ const config = useRuntimeConfig()
 onMounted(async () => {
 
 
-  const res = await $fetch(config.public.apiBase, {
-    method: 'POST',
+  const res = await $fetch(config.public.apiBase + "test", {
+    method: 'get',
     headers: {
       'Accept': 'application/json'
     },
-    body: {
+    // body: {
 
-    }
+    // }
   })
+  testdata.mobile = res.mobile
   console.log(res)
 
 })
