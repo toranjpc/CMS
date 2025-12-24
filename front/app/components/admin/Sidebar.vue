@@ -5,7 +5,7 @@
         class="toggle-btn d-none d-md-block me-2"
         @click="$emit('toggle')"
       >
-        <i class="fas fa-bars"></i>
+        <i class="fa fa-bars"></i>
       </button>
     </div>
 
@@ -17,7 +17,7 @@
           class="baseUrl"
           :class="{ active: isActive('/dashboard') }"
         >
-          <i class="fas fa-home"></i>
+          <i class="fa fa-home"></i>
           <span class="link-text">داشبورد</span>
         </NuxtLink>
       </li>
@@ -25,9 +25,9 @@
       <!-- کاربران (آکاردئونی) -->
       <li :class="{ open: isUsersOpen }">
         <a href="javascript:void(0)" @click="toggleUsers">
-          <i class="fas fa-users"></i>
+          <i class="fa fa-users"></i>
           <span class="link-text">کاربران</span>
-          <!-- <i class="fas fa-chevron-down arrow"></i> -->
+          <!-- <i class="fa fa-chevron-down arrow"></i> -->
         </a>
 
         <ul class="submenu" v-show="isUsersOpen">
@@ -49,24 +49,24 @@
           </li>
           <li>
             <NuxtLink
-              to="/dashboard/user-categories"
-              :class="{ active: isActive('/dashboard/user-categories') }"
+              to="/dashboard/users/categories"
+              :class="{ active: isActive('/dashboard/users/categories') }"
             >
               دسته‌بندی کاربران
             </NuxtLink>
           </li>
           <li>
             <NuxtLink
-              to="/dashboard/user-roles"
-              :class="{ active: isActive('/dashboard/user-roles') }"
+              to="/dashboard/users/roles"
+              :class="{ active: isActive('/dashboard/users/roles') }"
             >
               نقش‌های کاربری
             </NuxtLink>
           </li>
           <li>
             <NuxtLink
-              to="/dashboard/user-plans"
-              :class="{ active: isActive('/dashboard/user-plans') }"
+              to="/dashboard/users/plans"
+              :class="{ active: isActive('/dashboard/users/plans') }"
             >
               پل‌های کاربری
             </NuxtLink>
@@ -81,7 +81,7 @@
           class="baseUrl"
           :class="{ active: isActive('/dashboard/stats') }"
         >
-          <i class="fas fa-chart-line"></i>
+          <i class="fa fa-chart-line"></i>
           <span class="link-text">آمار</span>
         </NuxtLink>
       </li>

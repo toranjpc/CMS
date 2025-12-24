@@ -16,7 +16,7 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
 
   // If not authenticated, redirect to login
   if (!auth.isAuthenticated.value) {
-    console.log('🔒 User not authenticated, redirecting to login')
+    //console.log('🔒 User not authenticated, redirecting to login')
     return navigateTo('/login', { replace: true })
   }
 
@@ -25,14 +25,14 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     const isValid = await auth.validateToken()
 
     if (!isValid) {
-      console.log('❌ Token invalid, redirecting to login')
+      //console.log('❌ Token invalid, redirecting to login')
       auth.clearAuth()
       return navigateTo('/login', { replace: true })
     }
 
-    console.log('✅ User authenticated and token valid')
+    //console.log('✅ User authenticated and token valid')
   } catch (error) {
-    console.error('Token validation error in middleware:', error)
+    //console.error('Token validation error in middleware:', error)
     auth.clearAuth()
     return navigateTo('/login', { replace: true })
   }

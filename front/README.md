@@ -163,7 +163,7 @@ const loginUser = async () => {
       await navigateTo('/dashboard')
     }
   } catch (error) {
-    console.error('خطا در ورود:', error)
+    //console.error('خطا در ورود:', error)
   }
 }
 </script>

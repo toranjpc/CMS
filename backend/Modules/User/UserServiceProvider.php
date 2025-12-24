@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Modules\App\Jobs\LogActionJob;
+use Illuminate\Routing\Router;
+use Modules\User\Middleware\CheckPermission;
 
 
 class UserServiceProvider extends ServiceProvider
@@ -40,7 +42,7 @@ class UserServiceProvider extends ServiceProvider
             config(['auth.defaults.guard' => 'sanctum']);
         }
     }
-    public function boot(): void
+    public function boot(Router $router): void
     {
         // Override auth config for API authentication
         $this->configureAuth();
@@ -50,6 +52,8 @@ class UserServiceProvider extends ServiceProvider
         // $this->loadFactoriesFrom(__DIR__ . '/Database/factories');
         $this->loadViewsFrom(__DIR__ . '/Resources/views', 'user');
 
+        $middlewareClass = CheckPermission::class;
+        $router->aliasMiddleware('checkPermission', $middlewareClass);
 
         Event::listen(Login::class, function ($event) {
             $userId = $event->user->id ?? null;

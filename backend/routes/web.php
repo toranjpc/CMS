@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+use function PHPUnit\Framework\isNull;
+
 Route::get('/', function () {
     return '';
 });
@@ -11,6 +13,7 @@ Route::get('/test', function () {
 });
 
 Route::get('/routes', function () {
+
     $routes = collect(Route::getRoutes())->map(function ($route) {
         return [
             'method' => implode('|', $route->methods()),

@@ -183,7 +183,7 @@ const handleRegister = async () => {
       error.value = response.message || 'خطا در ثبت نام'
     }
   } catch (err) {
-    console.error('Register error:', err)
+    //console.error('Register error:', err)
     error.value = 'خطا در اتصال به سرور. لطفا دوباره تلاش کنید.'
   } finally {
     loading.value = false

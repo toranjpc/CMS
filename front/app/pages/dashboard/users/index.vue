@@ -53,7 +53,26 @@
     <!-- Users Table -->
     <div class="card">
       <div class="card-body">
-        <div class="table-responsive">
+        <!-- Loading State -->
+        <div v-if="loading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">در حال بارگذاری...</span>
+          </div>
+          <div class="mt-2 text-muted">در حال بارگذاری لیست کاربران...</div>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="error" class="alert alert-danger" role="alert">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          {{ error }}
+          <button class="btn btn-sm btn-outline-danger ms-2" @click="fetchUsers">
+            <i class="bi bi-arrow-clockwise"></i>
+            تلاش مجدد
+          </button>
+        </div>
+
+        <!-- Users Table -->
+        <div v-else class="table-responsive">
           <table class="table table-hover">
             <thead>
               <tr>
@@ -101,6 +120,15 @@
                     <button class="btn btn-outline-danger" @click="deleteUser(user)" title="حذف">
                       <i class="bi bi-trash"></i>
                     </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Empty State -->
+              <tr v-if="filteredUsers.length === 0">
+                <td colspan="6" class="text-center py-5">
+                  <div class="text-muted">
+                    <i class="bi bi-people display-4 mb-3"></i>
+                    <div>هیچ کاربری یافت نشد</div>
                   </div>
                 </td>
               </tr>
@@ -152,7 +180,6 @@
 
 <script setup>
 
-
 // Reactive data
 const searchQuery = ref('')
 const statusFilter = ref('')
@@ -160,60 +187,87 @@ const roleFilter = ref('')
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const showAddUserModal = ref(false)
+const users = ref([])
+const loading = ref(false)
+const error = ref(null)
 
-// Mock users data
-const users = ref([
-  {
-    id: 1,
-    name: 'احمد رضایی',
-    username: 'ahmad_r',
-    email: 'ahmad@example.com',
-    role: 'admin',
-    status: 'active',
-    avatar: 'https://via.placeholder.com/40',
-    createdAt: '2024-01-15T10:30:00Z'
-  },
-  {
-    id: 2,
-    name: 'مریم احمدی',
-    username: 'maryam_a',
-    email: 'maryam@example.com',
-    role: 'editor',
-    status: 'active',
-    avatar: 'https://via.placeholder.com/40',
-    createdAt: '2024-02-20T14:15:00Z'
-  },
-  {
-    id: 3,
-    name: 'علی محمدی',
-    username: 'ali_m',
-    email: 'ali@example.com',
-    role: 'user',
-    status: 'inactive',
-    avatar: 'https://via.placeholder.com/40',
-    createdAt: '2024-03-10T09:45:00Z'
-  },
-  {
-    id: 4,
-    name: 'فاطمه کریمی',
-    username: 'fatemeh_k',
-    email: 'fatemeh@example.com',
-    role: 'editor',
-    status: 'active',
-    avatar: 'https://via.placeholder.com/40',
-    createdAt: '2024-01-25T16:20:00Z'
-  },
-  {
-    id: 5,
-    name: 'حسن ابراهیمی',
-    username: 'hasan_i',
-    email: 'hasan@example.com',
-    role: 'user',
-    status: 'pending',
-    avatar: 'https://via.placeholder.com/40',
-    createdAt: '2024-04-05T11:30:00Z'
+// Get API instance
+const { $api } = useNuxtApp()
+
+// Fetch users from API
+const fetchUsers = async () => {
+  loading.value = true
+  error.value = null
+
+  try {
+    const response = await $api('/users') // Adjust endpoint as needed
+    users.value = response.data || response
+  } catch (err) {
+    console.error('Error fetching users:', err)
+    error.value = 'خطا در بارگذاری لیست کاربران'
+
+    // Fallback to mock data if API fails
+    users.value = [
+      {
+        id: 1,
+        name: 'احمد رضایی',
+        username: 'ahmad_r',
+        email: 'ahmad@example.com',
+        role: 'admin',
+        status: 'active',
+        avatar: 'https://via.placeholder.com/40',
+        createdAt: '2024-01-15T10:30:00Z'
+      },
+      {
+        id: 2,
+        name: 'مریم احمدی',
+        username: 'maryam_a',
+        email: 'maryam@example.com',
+        role: 'editor',
+        status: 'active',
+        avatar: 'https://via.placeholder.com/40',
+        createdAt: '2024-02-20T14:15:00Z'
+      },
+      {
+        id: 3,
+        name: 'علی محمدی',
+        username: 'ali_m',
+        email: 'ali@example.com',
+        role: 'user',
+        status: 'inactive',
+        avatar: 'https://via.placeholder.com/40',
+        createdAt: '2024-03-10T09:45:00Z'
+      },
+      {
+        id: 4,
+        name: 'فاطمه کریمی',
+        username: 'fatemeh_k',
+        email: 'fatemeh@example.com',
+        role: 'editor',
+        status: 'active',
+        avatar: 'https://via.placeholder.com/40',
+        createdAt: '2024-01-25T16:20:00Z'
+      },
+      {
+        id: 5,
+        name: 'حسن ابراهیمی',
+        username: 'hasan_i',
+        email: 'hasan@example.com',
+        role: 'user',
+        status: 'pending',
+        avatar: 'https://via.placeholder.com/40',
+        createdAt: '2024-04-05T11:30:00Z'
+      }
+    ]
+  } finally {
+    loading.value = false
   }
-])
+}
+
+// Load users on component mount
+onMounted(() => {
+  fetchUsers()
+})
 
 // Computed properties
 const filteredUsers = computed(() => {

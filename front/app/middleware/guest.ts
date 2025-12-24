@@ -16,10 +16,10 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
 
   // If authenticated, redirect to dashboard
   if (auth.isAuthenticated.value) {
-    console.log('🏠 User already authenticated, redirecting to dashboard')
+    //console.log('🏠 User already authenticated, redirecting to dashboard')
     return navigateTo('/dashboard', { replace: true })
   }
 
-  console.log('👤 User not authenticated, allowing access to guest route')
+  //console.log('👤 User not authenticated, allowing access to guest route')
 })
 

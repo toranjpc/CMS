@@ -2,8 +2,10 @@ import { ref, computed, nextTick } from 'vue'
 import { navigateTo, useRouter } from 'nuxt/app'
 import type { User, AuthState, LoginCredentials, AuthResponse } from '~/types/auth'
 
+// Global auth state - singleton pattern
+let authInstance: ReturnType<typeof createAuthInstance> | null = null
 
-export const useAuth = () => {
+function createAuthInstance() {
   const config = useRuntimeConfig()
   const router = useRouter()
 
@@ -33,7 +35,7 @@ export const useAuth = () => {
         authState.value.isAuthenticated = true
       }
     } catch (error) {
-      console.error('Error initializing auth:', error)
+      //console.error('Error initializing auth:', error)
       clearAuth()
     } finally {
       authState.value.loading = false
@@ -91,7 +93,7 @@ export const useAuth = () => {
         throw new Error(response.message || 'خطا در ورود به سیستم')
       }
     } catch (error: any) {
-      console.error('Login error:', error)
+      //console.error('Login error:', error)
 
       let errorMessage = 'خطا در اتصال به سرور'
 
@@ -126,7 +128,7 @@ export const useAuth = () => {
         })
       }
     } catch (error) {
-      console.error('Logout error:', error)
+      //console.error('Logout error:', error)
       // Continue with local logout even if API call fails
     } finally {
       clearAuth()
@@ -162,7 +164,7 @@ export const useAuth = () => {
 
       return false
     } catch (error) {
-      console.error('Token validation error:', error)
+      //console.error('Token validation error:', error)
       clearAuth()
       return false
     }
@@ -188,7 +190,7 @@ export const useAuth = () => {
 
       return false
     } catch (error) {
-      console.error('Token refresh error:', error)
+      //console.error('Token refresh error:', error)
       clearAuth()
       return false
     }
@@ -237,5 +239,12 @@ export const useAuth = () => {
     hasRole,
     initializeAuth
   }
+}
+
+export const useAuth = () => {
+  if (!authInstance) {
+    authInstance = createAuthInstance()
+  }
+  return authInstance
 }
 

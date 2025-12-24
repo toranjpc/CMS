@@ -97,8 +97,6 @@
 import { validateMobile, loginRateLimiter } from '~/utils/security'
 
 const authStore = useAuth()
-const router = useRouter()
-console.log(authStore)
 
 // Form data
 const form = reactive({
@@ -165,16 +163,14 @@ const handleLogin = async () => {
 
     if (result.success) {
       success.value = 'ورود با موفقیت انجام شد. در حال انتقال...'
-
-      // Redirect to dashboard after a short delay
-      setTimeout(async () => {
-        await router.push('/dashboard')
-      }, 1000)
+      
+      await nextTick()
+      await navigateTo('/dashboard')
     } else {
       error.value = result.error || 'خطا در ورود به سیستم'
     }
   } catch (err) {
-    console.error('Login error:', err)
+    //console.error('Login error:', err)
 
     if (err.response?.status === 422) {
       error.value = 'اطلاعات وارد شده صحیح نیست'
@@ -210,7 +206,7 @@ onMounted(async () => {
     // }
   })
   testdata.mobile = res.mobile
-  console.log(res)
+  //console.log(res)
 
 })
 

@@ -163,7 +163,7 @@ export class CSRFManager {
 
       return this.token
     } catch (error) {
-      console.error('Failed to get CSRF token:', error)
+      //console.error('Failed to get CSRF token:', error)
       throw error
     }
   }
@@ -179,7 +179,7 @@ export const csrfManager = new CSRFManager()
 // Security headers check (client-side)
 export const checkSecurityHeaders = (): void => {
   if (process.client && window.location.protocol !== 'https:') {
-    console.warn('⚠️  Warning: Not using HTTPS. Consider using HTTPS for production.')
+    //console.warn('⚠️  Warning: Not using HTTPS. Consider using HTTPS for production.')
   }
 }
 

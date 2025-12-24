@@ -18,8 +18,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 import AdminSidebar from '~/components/admin/Sidebar.vue'
 import AdminNavbar from '~/components/admin/Navbar.vue'
@@ -43,8 +43,11 @@ router.afterEach(() => {
 })
 
 useHead({
-  titleTemplate: (title) =>
-    title ? `${title} | پنل مدیریت` : 'پنل مدیریت'
+  title: computed(() => {
+    const route = useRoute()
+    const pageTitle = route.meta?.title
+    return pageTitle ? `پنل مدیریت | ${pageTitle}` : 'پنل مدیریت'
+  })
 })
 
 // Define layout meta
