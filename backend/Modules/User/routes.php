@@ -25,20 +25,20 @@ Route::prefix('auth')->middleware('api')->group(function () {
 
 Route::prefix('users')
     ->name('users.')
-    ->middleware(['checkPermission'])
+    ->middleware(['api', 'checkPermission'])
     ->group(function () { //auth:sanctum
 
         Route::prefix('jobs')->name('jobs.')->group(function () {
             Route::get('/', [UserController::class, 'job_index'])->name('index');
-            Route::get('{id}', [UserController::class, 'job_show'])->name('show');
+            // Route::get('{job}', [UserController::class, 'job_show'])->name('show');
             Route::post('/', [UserController::class, 'job_store'])->name('store');
-            Route::put('{id}', [UserController::class, 'job_update'])->name('update');
-            Route::delete('{id}', [UserController::class, 'job_destroy'])->name('destroy');
+            Route::put('{job}', [UserController::class, 'job_update'])->name('update');
+            Route::delete('{job}', [UserController::class, 'job_destroy'])->name('destroy');
         });
 
         Route::get('/', [UserController::class, 'index'])->name('index');
-        Route::get('{id}', [UserController::class, 'show'])->name('show');
+        Route::get('{user}', [UserController::class, 'show'])->name('show');
         Route::post('/', [UserController::class, 'store'])->name('store');
-        Route::put('{id}', [UserController::class, 'update'])->name('update');
-        Route::delete('{id}', [UserController::class, 'destroy'])->name('destroy');
+        Route::put('{user}', [UserController::class, 'update'])->name('update');
+        Route::delete('{user}', [UserController::class, 'destroy'])->name('destroy');
     });

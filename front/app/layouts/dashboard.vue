@@ -42,9 +42,10 @@ router.afterEach(() => {
   loading.value = false
 })
 
+const route = useRoute()
+
 useHead({
   title: computed(() => {
-    const route = useRoute()
     const pageTitle = route.meta?.title
     return pageTitle ? `پنل مدیریت | ${pageTitle}` : 'پنل مدیریت'
   })

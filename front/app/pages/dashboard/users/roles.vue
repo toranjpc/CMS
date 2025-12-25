@@ -6,7 +6,7 @@
           <h1 class="fw-bold mb-0">نقش‌های کاربری</h1>
           <p class="text-muted mt-1">مدیریت نقش‌ها و سطح دسترسی‌های کاربران سیستم</p>
         </div>
-        <button class="btn btn-primary" @click="showAddRoleModal = true">
+        <button class="btn btn-primary" @click="openRoleModal('create')">
           <i class="fa fa-plus-circle me-1"></i>
           افزودن نقش
         </button>
@@ -25,8 +25,8 @@
             </div>
             <div class="col-md-3">
               <select class="form-select" v-model="searchQuery.status">
-                <option value="1">فعال</option>
-                <option value="0">غیرفعال</option>
+                <option value="1">لیست فعال</option>
+                <option value="deleted">سطل زباله</option>
               </select>
             </div>
             <div class="col-md-2" v-if="Object.values(searchQuery).length">
@@ -85,7 +85,15 @@
                     <button class="btn text-info" @click="viewRole(role)" title="مشاهده">
                       <i class="fa fa-eye"></i>
                     </button>
-                    <button class="btn text-danger" @click="deleteRole(role)" title="حذف">
+                    <button class="btn text-warning" v-if="searchQuery.status == 'deleted'"
+                      @click="openDeleteModal(role, 'restore')" title="بازیافت">
+                      <i class="fa fa-refresh"></i>
+                    </button>
+                    <button class="btn text-danger" v-if="searchQuery.status == 'deleted'"
+                      @click="openDeleteModal(role, 'delete')" title="حذف برای همیشه">
+                      <i class="fa fa-times"></i>
+                    </button>
+                    <button class="btn text-danger" v-else @click="openDeleteModal(role)" title="حذف">
                       <i class="fa fa-times"></i>
                     </button>
                   </div>
@@ -136,34 +144,56 @@
       </div>
     </div>
 
-    <!-- Add Role Modal -->
-    <div class="modal fade" :class="{ show: showAddRoleModal }"
-      :style="{ display: showAddRoleModal ? 'block' : 'none' }" tabindex="-1">
+    <!-- Role Modal (Create/Edit/View) -->
+    <div class="modal fade" :class="{ show: showRoleModal }" :style="{ display: showRoleModal ? 'block' : 'none' }"
+      tabindex="-1">
+      <div class="shadow" @click="showRoleModal = false; currentRole = null"></div>
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">افزودن نقش جدید</h5>
-            <button type="button" class="btn-close" @click="showAddRoleModal = false"></button>
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title">
+              <span v-if="modalMode === 'create'">افزودن نقش جدید</span>
+              <span v-else-if="modalMode === 'edit'">ویرایش نقش</span>
+              <span v-else-if="modalMode === 'view'">مشاهده نقش</span>
+            </h5>
+            <button type="button" class="btn-close" @click="showRoleModal = false; currentRole = null"></button>
           </div>
           <div class="modal-body">
-            <form @submit.prevent="addRole">
+            <div class="card-title">
+              <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
+            </div>
+
+            <form @submit.prevent="modalMode !== 'view' ? saveRole() : null" v-if="currentRole">
               <div class="row g-3">
                 <div class="col-12">
                   <label class="form-label">نام نقش *</label>
-                  <input type="text" class="form-control" v-model="newRole.title" required />
+                  <input type="text" class="form-control" v-model="currentRole.title" :readonly="modalMode === 'view'"
+                    required />
                 </div>
                 <div class="col-12">
                   <label class="form-label">دسترسی‌ها</label>
                   <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
                     <div v-for="category in permissionCategories" :key="category" class="mb-3">
-                      <h6 class="text-primary mb-2">{{ category }}</h6>
-                      <div class="ms-3">
-                        <div class="form-check mb-1" v-for="permission in getPermissionsByCategory(category)"
+                      <h6 class="mb-2" v-if="category !== '*'">
+                        <input class="d-none" type="checkbox" :id="category"
+                          :checked="isCurrentCategoryChecked(category)"
+                          @change="modalMode !== 'view' ? toggleCurrentCategoryPermissions(category) : null"
+                          :disabled="modalMode === 'view'" />
+                        <label class="btn btn-sm"
+                          :class="isCurrentCategoryChecked(category) ? 'btn-success' : 'btn-outline-secondary'"
+                          :for="category" role="button">
+                          {{ trans(category) }}
+                        </label>
+                      </h6>
+                      <div class="ms-3 permition-list">
+                        <div class="mb-1" v-for="permission in getPermissionsByCategory(category)"
                           :key="permission.key">
-                          <input class="form-check-input" type="checkbox" :id="permission.key"
-                            v-model="newRole.permissions" :value="permission.key" />
-                          <label class="form-check-label small" :for="permission.key">
-                            {{ permission.label }}
+                          <input class="d-none" type="checkbox" :id="permission.key" v-model="currentRole.permissions"
+                            :value="permission.key" :disabled="modalMode === 'view'" />
+                          <label class="btn d-block btn-xs me-1 mb-1 text-truncate"
+                            :class="currentRole.permissions.includes(permission.key) ? 'btn-primary' : 'btn-outline-primary'"
+                            :for="permission.key" role="button">
+                            {{ trans(permission.label) }}
                           </label>
                         </div>
                       </div>
@@ -176,9 +206,54 @@
               </div>
             </form>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showAddRoleModal = false">انصراف</button>
-            <button type="button" class="btn btn-primary" @click="addRole">افزودن نقش</button>
+          <div class="modal-footer" v-if="formloading">
+            درحال بارگذاری ....
+            <div class="spinner-border btn btn-secondary" role="status"></div>
+          </div>
+          <div class="modal-footer" v-else-if="modalMode !== 'view'">
+            <button type="button" class="btn btn-secondary"
+              @click="showRoleModal = false; currentRole = null">انصراف</button>
+            <button type="button" class="btn btn-primary" @click="saveRole">
+              <span v-if="modalMode === 'create'">افزودن نقش</span>
+              <span v-else-if="modalMode === 'edit'">به‌روزرسانی نقش</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" :class="{ show: showDeleteModal }" :style="{ display: showDeleteModal ? 'block' : 'none' }"
+      tabindex="-1">
+      <div class="shadow" @click="cancelDelete"></div>
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title">
+              <i class="fa fa-exclamation-triangle me-2"></i>
+              تأیید حذف نقش
+            </h5>
+            <button type="button" class="btn-close btn-close-white" @click="cancelDelete"></button>
+          </div>
+          <div class="modal-body text-center py-4">
+            <div class="mb-3">
+              <i class="fa fa-trash-alt fa-3x text-danger mb-3"></i>
+            </div>
+            <h5 class="mb-3">آیا از حذف این نقش اطمینان دارید؟</h5>
+            <p class="text-muted mb-0" v-if="roleToDelete">
+              نقش "<strong>{{ roleToDelete.title }}</strong>" به طور کامل حذف خواهد شد و قابل بازیابی نخواهد بود.
+            </p>
+          </div>
+          <div class="modal-footer justify-content-center">
+            <button type="button" class="btn btn-secondary px-4" @click="cancelDelete" :disabled="formloading">
+              <i class="fa fa-times me-1"></i>
+              لغو
+            </button>
+            <button type="button" class="btn btn-danger px-4" @click="confirmDelete" :disabled="formloading">
+              <span v-if="formloading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <i class="fa fa-trash me-1" v-else></i>
+              حذف نقش
+            </button>
           </div>
         </div>
       </div>
@@ -192,11 +267,12 @@ definePageMeta({
   middleware: 'auth',
   title: 'نقش‌های کاربری'
 })
-// Reactive data
 const { $api } = useNuxtApp()
 
 const roles = ref([])
 const loading = ref(false)
+const formloading = ref(false)
+const formError = ref(null)
 const error = ref(null)
 const totalitems = ref(0)
 const totalPages = ref(0)
@@ -204,7 +280,12 @@ const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const searchQuery = ref([])
 
-const showAddRoleModal = ref(false)
+const showRoleModal = ref(false)
+const modalMode = ref('create') /* 'create', 'edit', 'view' */
+const currentRole = ref(null)
+const showDeleteModal = ref(false)
+const DeleteModalMethode = ref('')
+const roleToDelete = ref(null)
 const availablePermissions = ref([])
 
 const getData = async (iPP, cP, wP = 0) => {
@@ -241,7 +322,6 @@ const getData = async (iPP, cP, wP = 0) => {
     }
 
   } catch (err) {
-    console.error('Error fetching roles and permissions:', err)
     error.value = 'خطا در بارگذاری لیست نقش‌ها'
   } finally {
     loading.value = false
@@ -255,7 +335,6 @@ const newRole = reactive({
 })
 
 
-// Load data on component mount
 onMounted(() => {
   getData(itemsPerPage.value, currentPage.value, 1)
 })
@@ -265,8 +344,44 @@ const permissionCategories = computed(() => {
   return [...new Set(availablePermissions.value.map(p => p.category))].sort()
 })
 
+const trans = (text) => {
+  const arr = {
+    "*": "دسترسی کامل",
+    "users": "کاربران",
+    "users.show": "نمایش اطلاعات کاربر",
+  }
+  return arr[text] || text
+}
+
 const getPermissionsByCategory = (category) => {
   return availablePermissions.value.filter(p => p.category === category)
+}
+
+const isCurrentCategoryChecked = (category) => {
+  if (!currentRole.value) return false
+  const categoryPermissions = getPermissionsByCategory(category)
+  return categoryPermissions.every(perm => currentRole.value.permissions.includes(perm.key))
+}
+
+const toggleCurrentCategoryPermissions = (category) => {
+  if (!currentRole.value) return
+
+  const categoryPermissions = getPermissionsByCategory(category)
+  const permissionKeys = categoryPermissions.map(perm => perm.key)
+
+  const allSelected = permissionKeys.every(key => currentRole.value.permissions.includes(key))
+
+  if (allSelected) {
+    currentRole.value.permissions = currentRole.value.permissions.filter(perm => !permissionKeys.includes(perm))
+  } else {
+    const newPermissions = [...currentRole.value.permissions]
+    permissionKeys.forEach(key => {
+      if (!newPermissions.includes(key)) {
+        newPermissions.push(key)
+      }
+    })
+    currentRole.value.permissions = newPermissions
+  }
 }
 
 const formatDate = (dateString) => {
@@ -286,51 +401,149 @@ const resetFilters = () => {
 }
 
 
-
-
-const addRole = () => {
-  if (!newRole.title.trim()) return
-
-  const role = {
-    id: Date.now(), // Temporary ID
-    f_id: null,
-    title: newRole.title,
-    kind: 'job',
-    option: {
-      form: null,
-      permissions: newRole.permissions.length > 0 ? newRole.permissions : []
-    },
-    status: 1,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    deleted_at: null
+const saveRole = async () => {
+  if (!currentRole.value.title.trim()) {
+    formError.value = 'عنوان نقش الزامی است'
+    return
   }
 
-  roles.value.push(role)
+  formloading.value = true
+  formError.value = null
 
-  // Reset form
-  Object.assign(newRole, {
-    title: '',
-    permissions: []
-  })
+  try {
+    const roleData = {
+      title: currentRole.value.title,
+      permissions: currentRole.value.permissions,
+    }
 
-  showAddRoleModal.value = false
-  alert('نقش با موفقیت اضافه شد!')
+    let response
+    if (modalMode.value === 'create') {
+      response = await $api('/users/jobs', {
+        method: 'POST',
+        body: roleData
+      })
+
+      if (response?.data) {
+        roles.value.unshift(response.data)
+      }
+    } else if (modalMode.value === 'edit') {
+      response = await $api(`/users/jobs/${currentRole.value.id}`, {
+        method: 'PUT',
+        body: roleData
+      })
+      console.log(response)
+
+      if (response?.data) {
+        const index = roles.value.findIndex(r => r.id === currentRole.value.id)
+        if (index !== -1) {
+          roles.value[index] = response.data
+        }
+      }
+    }
+
+    showRoleModal.value = false
+    currentRole.value = null
+
+  } catch (err) {
+    const status = err?.response?.status
+    const data = err?.response?._data
+
+    if (status === 422 && data?.errors) {
+      formError.value = Object.values(data.errors)
+        .flat()
+        .join(' ، ')
+    }
+    else if (data?.message) {
+      formError.value = "خطایی رخ داده لطفا با پشتیبانی تماس بگیرید"
+    }
+    else {
+      formError.value = 'خطایی در ارتباط با سرور رخ داد'
+    }
+  } finally {
+    formloading.value = false
+  }
+}
+
+
+const openRoleModal = (mode = 'create', role = null) => {
+  modalMode.value = mode
+
+  if (mode === 'create') {
+    currentRole.value = {
+      title: '',
+      permissions: []
+    }
+  } else if (role) {
+    currentRole.value = { ...role }
+    const permissions = role.option?.permissions || []
+    currentRole.value.permissions = Array.isArray(permissions) ? permissions : []
+  }
+
+  showRoleModal.value = true
 }
 
 const editRole = (role) => {
-  alert(`ویرایش نقش: ${role.title}`)
+  formError.value = null
+  openRoleModal('edit', role)
 }
 
 const viewRole = (role) => {
-  alert(`مشاهده نقش: ${role.title}`)
+  formError.value = null
+  openRoleModal('view', role)
 }
 
 
-const deleteRole = (role) => {
-  if (confirm(`آیا از حذف نقش "${role.title}" اطمینان دارید؟`)) {
-    roles.value = roles.value.filter(r => r.id !== role.id)
+
+const openDeleteModal = (role, method = '') => {
+  roleToDelete.value = role
+  showDeleteModal.value = true
+  DeleteModalMethode.value = method
+}
+
+const confirmDelete = async () => {
+  if (!roleToDelete.value) return
+
+  formloading.value = true
+  error.value = null
+
+  try {
+    await $api(`/users/jobs/${roleToDelete.value.id}`, {
+      method: 'DELETE',
+      body: { action: DeleteModalMethode.value }
+    })
+
+    // حذف نقش از لیست
+    roles.value = roles.value.filter(r => r.id !== roleToDelete.value.id)
+
+    // بستن مدال و ریست کردن
+    showDeleteModal.value = false
+    roleToDelete.value = null
+
+    // نمایش پیام موفقیت
+    alert('نقش با موفقیت حذف شد!')
+
+  } catch (err) {
+    console.error('Error deleting role:', err)
+    const status = err?.response?.status
+    const data = err?.response?._data
+
+    if (status === 404) {
+      error.value = 'نقش یافت نشد'
+    } else if (status === 403) {
+      error.value = 'شما دسترسی حذف این نقش را ندارید'
+    } else if (data?.message) {
+      error.value = data.message
+    } else {
+      error.value = 'خطا در حذف نقش'
+    }
+  } finally {
+    formloading.value = false
   }
+}
+
+const cancelDelete = () => {
+  showDeleteModal.value = false
+  roleToDelete.value = null
 }
 </script>
 
@@ -380,5 +593,15 @@ const deleteRole = (role) => {
 
 .progress-bar {
   background-color: #0d6efd;
+}
+
+.permition-list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.permition-list div {
+  width: 25%;
 }
 </style>
