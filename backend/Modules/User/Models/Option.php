@@ -23,11 +23,11 @@ class Option extends Model
 
     public function parent()
     {
-        return $this->hasMany(Option::class, 'f_id', 'id');
+        return $this->hasMany(Option::class, 'id', 'f_id');
     }
 
     public function childs()
     {
-        return $this->hasMany(Option::class, 'id', 'f_id');
+        return $this->hasMany(Option::class, 'f_id', 'id');
     }
 }

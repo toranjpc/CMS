@@ -7,6 +7,8 @@ use Illuminate\Routing\Controller;
 use Modules\User\Models\User;
 use Modules\User\Models\Option;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -67,11 +69,178 @@ class UserController extends Controller
         return response()->json(null, 204);
     }
 
+    /******* categories *******/
+    public function category_index()
+    {
+        try {
+            $Options = Option::select('id', 'f_id', 'title', 'option', 'created_at', 'deleted_at')
+                ->where("kind", "category");
+
+            if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
+            if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
+            $Options = $Options->orderBy('id', 'DESC')->paginate(request("limit", 5));
+            $Options = [
+                'items' => $Options->items(),
+                'total' => $Options->total(),
+                'per_page' => $Options->perPage(),
+                'current_page' => $Options->currentPage(),
+                'last_page' => $Options->lastPage(),
+                'from' => $Options->firstItem(),
+                'to' => $Options->lastItem(),
+            ];
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "data" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            // throw $th;
+            return response()->json(
+                [
+                    "status" => "error",
+                ]
+            );
+        }
+    }
+
+    public function category_show($id)
+    {
+        return response()->json(Option::findOrFail($id));
+    }
+
+    public function category_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique('options', 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'category')
+                            ->whereNull('deleted_at'),
+                    ],
+                ],
+                [
+                    'title.required' => 'عنوان دسته بندی الزامی است',
+                    'title.string' => 'عنوان دسته بندی باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان دسته بندی نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                ]
+            );
+
+            $category = Option::create([
+                "title" => $data['title'],
+                "kind" => "category",
+                "option" => [],
+            ]);
+
+            return response()->json([
+                "status" => "success",
+                "data" => $category
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت دسته بندی رخ داد",
+            ], 500);
+        }
+    }
+
+    public function category_update(Request $request, Option $category)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique('options', 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'category')
+                            ->whereNull('deleted_at')
+                            ->ignore($category->id),
+                    ],
+                ],
+                [
+                    'title.required' => 'عنوان دسته بندی الزامی است',
+                    'title.string' => 'عنوان دسته بندی باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان دسته بندی نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                ]
+            );
+
+            $category->title = $data['title'];
+            $category->update();
+
+            return response()->json([
+                "status" => "success",
+                "data" => $category
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش دسته بندی رخ داد",
+            ], 500);
+        }
+    }
+
+
+    public function category_destroy(Option $category)
+    {
+        $category->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "دسته بندی با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function category_force_destroy($id)
+    {
+        $category = Option::withTrashed()->findOrFail($id);
+
+        $category->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "دسته بندی به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+
+    public function category_restore($id)
+    {
+        $category = Option::withTrashed()->findOrFail($id);
+        $category->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "دسته بندی بازیابی شد",
+            "data" => $category
+        ], 200);
+    }
+    /******* categories *******/
+
+
     /******* Jobs *******/
     public function job_index()
     {
         try {
-            $Options = Option::select('id', 'title', 'option', 'created_at')
+            $Options = Option::select('id', 'title', 'option', 'created_at', 'deleted_at')
                 ->where("kind", "job");
             if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
             if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
@@ -102,7 +271,8 @@ class UserController extends Controller
                     "status" => "success",
                     "pers" => $pers,
                     "data" => $Options
-                ]
+                ],
+                200
             );
         } catch (\Throwable $th) {
             // throw $th;
@@ -124,13 +294,23 @@ class UserController extends Controller
         try {
             $data = $request->validate(
                 [
-                    'title' => 'required|string|max:255',
+                    // 'title' => 'required|string|max:255|unique:options,title,NULL,id,f_id,0,kind,job,deleted_at,NULL',
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique('options', 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'job')
+                            ->whereNull('deleted_at'),
+                    ],
                     'permissions' => 'nullable|array',
                 ],
                 [
                     'title.required' => 'عنوان نقش الزامی است',
                     'title.string' => 'عنوان نقش باید به‌صورت متن باشد',
                     'title.max' => 'عنوان نقش نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
 
                     'permissions.required' => 'انتخاب حداقل یک دسترسی الزامی است',
                     'permissions.array' => 'فرمت دسترسی‌ها نامعتبر است',
@@ -168,13 +348,24 @@ class UserController extends Controller
         try {
             $data = $request->validate(
                 [
-                    'title' => 'required|string|max:255',
+                    // 'title' => 'required|string|max:255|unique:options,title,' . $job->id . ',id,f_id,0,kind,job,deleted_at,NULL',
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique('options', 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'job')
+                            ->whereNull('deleted_at')
+                            ->ignore($job->id),
+                    ],
                     'permissions' => 'nullable|array',
                 ],
                 [
                     'title.required' => 'عنوان نقش الزامی است',
                     'title.string' => 'عنوان نقش باید به‌صورت متن باشد',
                     'title.max' => 'عنوان نقش نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
 
                     'permissions.required' => 'انتخاب حداقل یک دسترسی الزامی است',
                     'permissions.array' => 'فرمت دسترسی‌ها نامعتبر است',
@@ -203,31 +394,33 @@ class UserController extends Controller
         }
     }
 
-    public function job_destroy(Request $request, $job)
+    public function job_destroy(Option $job)
     {
-        if (!empty($request->action)) {
-            if ($request->action == "restore") {
-                $BaseJob = Option::withTrashed()->findOrFail($job);
-                $BaseJob->restore();
-                return response()->json([
-                    "status" => "success",
-                    "message" => "نقش بازیابی شد",
-                    "data" => $BaseJob
-                ], 200);
-            } elseif ($request->action == "delete") {
-                $BaseJob = Option::withTrashed()->findOrFail($job);
-                $BaseJob->forceDelete(); // Permanent delete
-                return response()->json([
-                    "status" => "success",
-                    "message" => "نقش به صورت دائمی حذف شد"
-                ], 200);
-            }
-        }
-        $BaseJob = Option::findOrFail($job);
-        $BaseJob->delete(); // Soft delete
+        $job->delete();
         return response()->json([
             "status" => "success",
             "message" => "نقش با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function job_force_destroy($id)
+    {
+        $job = Option::withTrashed()->findOrFail($id);
+        $job->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "نقش به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function job_restore($id)
+    {
+        $job = Option::withTrashed()->findOrFail($id);
+        $job->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "نقش بازیابی شد",
+            "data" => $job
         ], 200);
     }
     /******* Jobs *******/

@@ -226,6 +226,59 @@ body {
     height: 100%;
 }
 
+
+
+
+
+/* Table row selection styles */
+table.table td,
+table.table th {
+    vertical-align: middle;
+}
+
+table.table tbody tr.selected {
+    border-right: 4px solid #2196f3;
+}
+
+table.table tbody tr.current-row {
+    border-right: 4px solid #ff9800;
+}
+
+table.table tbody tr.selected.current-row {
+    border-right: 4px solid #4caf50;
+}
+
+table.table tbody tr.selected td {
+    background-color: #e3f2fd !important;
+}
+
+table.table tbody tr.current-row td {
+    background-color: #fff3e0 !important;
+}
+
+table.table tbody tr.selected.current-row td {
+    background-color: #e8f5e8 !important;
+}
+
+
+
+/* Hover effects for selectable rows */
+table.table tbody tr {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+table.table tbody tr:hover {
+    background-color: #f8f9fa !important;
+}
+
+
+
+
+
+
+
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);

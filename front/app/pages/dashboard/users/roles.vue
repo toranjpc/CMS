@@ -5,11 +5,24 @@
         <div>
           <h1 class="fw-bold mb-0">نقش‌های کاربری</h1>
           <p class="text-muted mt-1">مدیریت نقش‌ها و سطح دسترسی‌های کاربران سیستم</p>
+          <div v-if="selectedTr.length > 0" class="mt-2">
+            <small class="text-primary">
+              <i class="fa fa-check-circle me-1"></i>
+              {{ selectedTr.length }} سطر انتخاب شده
+            </small>
+          </div>
         </div>
-        <button class="btn btn-primary" @click="openRoleModal('create')">
-          <i class="fa fa-plus-circle me-1"></i>
-          افزودن نقش
-        </button>
+        <div class="d-flex gap-2">
+          <button v-if="searchQuery.status != 'deleted' && selectedTr.length > 0" class="btn btn-outline-danger"
+            @click="bulkDeleteSelected" title="حذف گروهی">
+            <i class="fa fa-trash me-1"></i>
+            حذف انتخاب شده‌ها ({{ selectedTr.length }})
+          </button>
+          <button class="btn btn-primary" @click="openRoleModal('create')">
+            <i class="fa fa-plus-circle me-1"></i>
+            افزودن نقش
+          </button>
+        </div>
       </div>
     </div>
 
@@ -68,34 +81,40 @@
           <table class="table table-hover">
             <thead>
               <tr>
-                <th width="10%">شناسه</th>
+                <th width="10%">شناسه <small class="text-muted">(کلیک برای انتخاب)</small></th>
                 <th width="">عنوان</th>
                 <th width="20%">تاریخ ایجاد</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="role in roles" :key="role.id">
-                <td>{{ role.id }}</td>
+              <tr v-for="(role, index) in roles" :key="role.id" :class="getRowClass(role.id, index)"
+                @click="setCurrentRow(index)">
+                <td @click="toggleRowSelection(role.id)">
+                  <input type="checkbox" v-if="selectedTr.includes(role.id)" checked class="form-check-input me-2">
+                  <a href="javascript:;" v-else class="text-decoration-none">{{ role.id }}</a>
+                </td>
                 <td>{{ role.title }}
 
                   <div class="actionBTN btn-group btn-group-sm float-end">
-                    <button class="btn text-primary" @click="editRole(role)" title="ویرایش">
-                      <i class="fa fa-pencil"></i>
-                    </button>
-                    <button class="btn text-info" @click="viewRole(role)" title="مشاهده">
-                      <i class="fa fa-eye"></i>
-                    </button>
-                    <button class="btn text-warning" v-if="searchQuery.status == 'deleted'"
-                      @click="openDeleteModal(role, 'restore')" title="بازیافت">
-                      <i class="fa fa-refresh"></i>
-                    </button>
-                    <button class="btn text-danger" v-if="searchQuery.status == 'deleted'"
-                      @click="openDeleteModal(role, 'delete')" title="حذف برای همیشه">
-                      <i class="fa fa-times"></i>
-                    </button>
-                    <button class="btn text-danger" v-else @click="openDeleteModal(role)" title="حذف">
-                      <i class="fa fa-times"></i>
-                    </button>
+                    <div v-if="role.deleted_at">
+                      <button class="btn text-warning" @click="openDeleteModal(role, 'restore')" title="بازیافت">
+                        <i class="fa fa-refresh"></i>
+                      </button>
+                      <button class="btn text-danger" @click="openDeleteModal(role, 'delete')" title="حذف برای همیشه">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
+                    <div v-else>
+                      <button class="btn text-primary" @click="editRole(role)" title="ویرایش">
+                        <i class="fa fa-pencil"></i>
+                      </button>
+                      <button class="btn text-info" @click="viewRole(role)" title="مشاهده">
+                        <i class="fa fa-eye"></i>
+                      </button>
+                      <button class="btn text-danger" @click="openDeleteModal(role)" title="حذف">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
                   </div>
 
                 </td>
@@ -168,7 +187,7 @@
                 <div class="col-12">
                   <label class="form-label">نام نقش *</label>
                   <input type="text" class="form-control" v-model="currentRole.title" :readonly="modalMode === 'view'"
-                    required />
+                    ref="roleTitleInput" required />
                 </div>
                 <div class="col-12">
                   <label class="form-label">دسترسی‌ها</label>
@@ -222,46 +241,12 @@
       </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" :class="{ show: showDeleteModal }" :style="{ display: showDeleteModal ? 'block' : 'none' }"
-      tabindex="-1">
-      <div class="shadow" @click="cancelDelete"></div>
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-danger text-white">
-            <h5 class="modal-title">
-              <i class="fa fa-exclamation-triangle me-2"></i>
-              تأیید حذف نقش
-            </h5>
-            <button type="button" class="btn-close btn-close-white" @click="cancelDelete"></button>
-          </div>
-          <div class="modal-body text-center py-4">
-            <div class="mb-3">
-              <i class="fa fa-trash-alt fa-3x text-danger mb-3"></i>
-            </div>
-            <h5 class="mb-3">آیا از حذف این نقش اطمینان دارید؟</h5>
-            <p class="text-muted mb-0" v-if="roleToDelete">
-              نقش "<strong>{{ roleToDelete.title }}</strong>" به طور کامل حذف خواهد شد و قابل بازیابی نخواهد بود.
-            </p>
-          </div>
-          <div class="modal-footer justify-content-center">
-            <button type="button" class="btn btn-secondary px-4" @click="cancelDelete" :disabled="formloading">
-              <i class="fa fa-times me-1"></i>
-              لغو
-            </button>
-            <button type="button" class="btn btn-danger px-4" @click="confirmDelete" :disabled="formloading">
-              <span v-if="formloading" class="spinner-border spinner-border-sm me-2" role="status"></span>
-              <i class="fa fa-trash me-1" v-else></i>
-              حذف نقش
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
+import Swal from 'sweetalert2'
+
 definePageMeta({
   layout: 'dashboard',
   middleware: 'auth',
@@ -279,13 +264,13 @@ const totalPages = ref(0)
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const searchQuery = ref([])
+const selectedTr = ref([])
+const currentRowIndex = ref(-1)
 
 const showRoleModal = ref(false)
 const modalMode = ref('create') /* 'create', 'edit', 'view' */
 const currentRole = ref(null)
-const showDeleteModal = ref(false)
-const DeleteModalMethode = ref('')
-const roleToDelete = ref(null)
+const roleTitleInput = ref(null)
 const availablePermissions = ref([])
 
 const getData = async (iPP, cP, wP = 0) => {
@@ -306,12 +291,15 @@ const getData = async (iPP, cP, wP = 0) => {
 
 
     const response = await $api(url)
-    // console.log(response)
 
     roles.value = response.data?.items || []
     totalitems.value = response.data?.total || 0
     totalPages.value = response.data?.last_page || 0
     currentPage.value = response.data?.current_page || 1
+
+    // ریست کردن انتخاب‌ها وقتی داده‌ها تغییر می‌کنند
+    selectedTr.value = []
+    currentRowIndex.value = -1 // هیچ سطری انتخاب نشده
 
     if (response.pers.length) {
       availablePermissions.value = (response.pers || []).map(perm => ({
@@ -337,8 +325,172 @@ const newRole = reactive({
 
 onMounted(() => {
   getData(itemsPerPage.value, currentPage.value, 1)
+  setupKeyboardNavigation()
 })
 
+// Keyboard navigation setup
+const setupKeyboardNavigation = () => {
+  const handleKeyDown = (event) => {
+    // اگر فوکوس روی input یا textarea باشد، کلیدها را پردازش نکن
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+      return
+    }
+
+    switch (event.key) {
+      case 'ArrowUp':
+        event.preventDefault()
+        navigateRows(-1)
+        break
+      case 'ArrowDown':
+        event.preventDefault()
+        navigateRows(1)
+        break
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        // برای roles.vue، کلیدهای چپ و راست کاری انجام نمی‌دهند
+        break
+      case ' ':
+        event.preventDefault()
+        toggleCurrentRowSelection()
+        break
+      case 'Enter':
+        event.preventDefault()
+        // Enter روی سطر فعلی کلیک می‌کند
+        if (currentRowIndex.value >= 0 && roles.value[currentRowIndex.value]) {
+          // می‌توانیم اینجا عملیات خاصی تعریف کنیم، مثلاً ویرایش
+        }
+        break
+    }
+  }
+
+  // اضافه کردن event listener
+  document.addEventListener('keydown', handleKeyDown)
+
+  // پاک کردن event listener هنگام unmount
+  onUnmounted(() => {
+    document.removeEventListener('keydown', handleKeyDown)
+  })
+}
+
+const navigateRows = (direction) => {
+  const totalRows = roles.value.length
+  if (totalRows === 0) return
+
+  // اگر هیچ سطری انتخاب نشده، اولین حرکت کاربر را به اولین سطر ببر
+  if (currentRowIndex.value === -1) {
+    currentRowIndex.value = direction > 0 ? 0 : totalRows - 1
+    return
+  }
+
+  // حرکت به سطر بعدی/قبلی
+  currentRowIndex.value += direction
+
+  // محدود کردن به محدوده مجاز
+  if (currentRowIndex.value < 0) {
+    currentRowIndex.value = 0
+  } else if (currentRowIndex.value >= totalRows) {
+    currentRowIndex.value = totalRows - 1
+  }
+}
+
+const setCurrentRow = (index) => {
+  currentRowIndex.value = index
+}
+
+const toggleCurrentRowSelection = () => {
+  if (currentRowIndex.value === -1 || !roles.value[currentRowIndex.value]) return
+
+  const roleId = roles.value[currentRowIndex.value].id
+  toggleRowSelection(roleId)
+}
+
+const toggleRowSelection = (roleId) => {
+  const index = selectedTr.value.indexOf(roleId)
+  if (index > -1) {
+    // حذف از لیست انتخاب شده
+    selectedTr.value.splice(index, 1)
+  } else {
+    // اضافه کردن به لیست انتخاب شده
+    selectedTr.value.push(roleId)
+  }
+}
+
+const getRowClass = (roleId, index) => {
+  const classes = []
+
+  if (selectedTr.value.includes(roleId)) {
+    classes.push('selected')
+  }
+
+  if (index === currentRowIndex.value) {
+    classes.push('current-row')
+  }
+
+  return classes.join(' ')
+}
+
+const bulkDeleteSelected = async () => {
+  const result = await Swal.fire({
+    title: 'تأیید حذف گروهی',
+    text: `آیا مطمئن هستید که می‌خواهید ${selectedTr.value.length} نقش انتخاب شده را حذف کنید؟`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'بله، حذف کن',
+    cancelButtonText: 'لغو',
+    reverseButtons: true,
+    customClass: {
+      popup: 'swal-rtl'
+    }
+  })
+
+  if (!result.isConfirmed) return
+
+  formloading.value = true
+  let successCount = 0
+  let errorCount = 0
+
+  for (const roleId of selectedTr.value) {
+    try {
+      await $api(`/users/jobs/${roleId}`, {
+        method: 'DELETE'
+      })
+      successCount++
+    } catch (err) {
+      errorCount++
+    }
+  }
+
+  selectedTr.value = []
+  currentRowIndex.value = -1
+
+  await getData(itemsPerPage.value, currentPage.value, 0)
+
+  if (errorCount === 0) {
+    await Swal.fire({
+      title: 'انجام شد!',
+      text: `${successCount} نقش با موفقیت حذف شد.`,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  } else {
+    await Swal.fire({
+      title: 'عملیات نیمه کامل',
+      text: `${successCount} نقش حذف شد. ${errorCount} نقش با خطا مواجه شد.`,
+      icon: 'warning',
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  }
+
+  formloading.value = false
+}
 
 const permissionCategories = computed(() => {
   return [...new Set(availablePermissions.value.map(p => p.category))].sort()
@@ -397,6 +549,8 @@ const searchFilters = () => {
 }
 const resetFilters = () => {
   searchQuery.value = []
+  selectedTr.value = []
+  currentRowIndex.value = -1
   getData(itemsPerPage.value, currentPage.value, 0)
 }
 
@@ -431,7 +585,6 @@ const saveRole = async () => {
         method: 'PUT',
         body: roleData
       })
-      console.log(response)
 
       if (response?.data) {
         const index = roles.value.findIndex(r => r.id === currentRole.value.id)
@@ -465,8 +618,9 @@ const saveRole = async () => {
 }
 
 
-const openRoleModal = (mode = 'create', role = null) => {
+const openRoleModal = async (mode = 'create', role = null) => {
   modalMode.value = mode
+  formError.value = null
 
   if (mode === 'create') {
     currentRole.value = {
@@ -480,71 +634,137 @@ const openRoleModal = (mode = 'create', role = null) => {
   }
 
   showRoleModal.value = true
+
+  await nextTick()
+  if (roleTitleInput.value) {
+    roleTitleInput.value.focus()
+  }
 }
 
 const editRole = (role) => {
-  formError.value = null
   openRoleModal('edit', role)
 }
 
 const viewRole = (role) => {
-  formError.value = null
   openRoleModal('view', role)
 }
 
 
 
-const openDeleteModal = (role, method = '') => {
-  roleToDelete.value = role
-  showDeleteModal.value = true
-  DeleteModalMethode.value = method
+const openDeleteModal = async (role, method = '') => {
+  let title, text, icon, confirmButtonText, confirmButtonColor
+
+  if (method === 'restore') {
+    title = 'بازیابی نقش'
+    text = `آیا می‌خواهید نقش "${role.title}" را بازیابی کنید؟`
+    icon = 'question'
+    confirmButtonText = 'بله، بازیابی کن'
+    confirmButtonColor = '#28a745'
+  } else if (method === 'delete') {
+    title = 'حذف کامل نقش'
+    text = `آیا مطمئن هستید که می‌خواهید نقش "${role.title}" را برای همیشه حذف کنید؟ این عمل قابل برگشت نیست!`
+    icon = 'error'
+    confirmButtonText = 'بله، برای همیشه حذف کن'
+    confirmButtonColor = '#dc3545'
+  } else {
+    title = 'حذف نقش'
+    text = `آیا می‌خواهید نقش "${role.title}" را حذف کنید؟`
+    icon = 'warning'
+    confirmButtonText = 'بله، حذف کن'
+    confirmButtonColor = '#dc3545'
+  }
+
+  const result = await Swal.fire({
+    title,
+    text,
+    icon,
+    showCancelButton: true,
+    confirmButtonColor,
+    cancelButtonColor: '#6c757d',
+    confirmButtonText,
+    cancelButtonText: 'لغو',
+    reverseButtons: true,
+    customClass: {
+      popup: 'swal-rtl'
+    }
+  })
+
+  if (result.isConfirmed) {
+    await confirmDelete(role, method)
+  }
 }
 
-const confirmDelete = async () => {
-  if (!roleToDelete.value) return
-
+const confirmDelete = async (role, method = '') => {
   formloading.value = true
   error.value = null
 
   try {
-    await $api(`/users/jobs/${roleToDelete.value.id}`, {
-      method: 'DELETE',
-      body: { action: DeleteModalMethode.value }
+    let url, httpMethod, successMessage
+
+    if (method === 'restore') {
+      url = `/users/jobs/${role.id}/restore`
+      httpMethod = 'PATCH'
+      successMessage = 'نقش با موفقیت بازیابی شد!'
+    } else if (method === 'delete') {
+      url = `/users/jobs/${role.id}/force`
+      httpMethod = 'DELETE'
+      successMessage = 'نقش برای همیشه حذف شد!'
+    } else {
+      url = `/users/jobs/${role.id}`
+      httpMethod = 'DELETE'
+      successMessage = 'نقش با موفقیت حذف شد!'
+    }
+
+    await $api(url, {
+      method: httpMethod
     })
 
-    // حذف نقش از لیست
-    roles.value = roles.value.filter(r => r.id !== roleToDelete.value.id)
-
-    // بستن مدال و ریست کردن
-    showDeleteModal.value = false
-    roleToDelete.value = null
+    // به‌روزرسانی لیست بر اساس نوع عملیات
+    if (method === 'restore' || method === 'delete') {
+      roles.value = roles.value.filter(r => r.id !== role.id)
+    } else {
+      // برای حذف عادی، نقش را از لیست حذف می‌کنیم
+      roles.value = roles.value.filter(r => r.id !== role.id)
+    }
 
     // نمایش پیام موفقیت
-    alert('نقش با موفقیت حذف شد!')
+    await Swal.fire({
+      title: 'انجام شد!',
+      text: successMessage,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
 
   } catch (err) {
-    console.error('Error deleting role:', err)
     const status = err?.response?.status
     const data = err?.response?._data
+    let errorMessage = 'خطا در عملیات'
 
     if (status === 404) {
-      error.value = 'نقش یافت نشد'
+      errorMessage = 'نقش یافت نشد'
     } else if (status === 403) {
-      error.value = 'شما دسترسی حذف این نقش را ندارید'
+      errorMessage = 'شما دسترسی انجام این عملیات را ندارید'
     } else if (data?.message) {
-      error.value = data.message
-    } else {
-      error.value = 'خطا در حذف نقش'
+      errorMessage = data.message
     }
+
+    await Swal.fire({
+      title: 'خطا!',
+      text: errorMessage,
+      icon: 'error',
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
   } finally {
     formloading.value = false
   }
 }
 
-const cancelDelete = () => {
-  showDeleteModal.value = false
-  roleToDelete.value = null
-}
 </script>
 
 <style scoped>
@@ -603,5 +823,14 @@ const cancelDelete = () => {
 
 .permition-list div {
   width: 25%;
+}
+
+/* SweetAlert2 RTL Support */
+.swal-rtl {
+  direction: rtl;
+}
+
+.swal-rtl .swal2-popup .swal2-actions {
+  flex-direction: row-reverse;
 }
 </style>

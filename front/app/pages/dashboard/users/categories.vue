@@ -1,416 +1,706 @@
 <template>
-  <div class="user-categories-page">
+  <div class="user-categorys-page">
     <div class="row mb-4">
       <div class="col-12 d-flex justify-content-between align-items-center">
         <div>
-          <h1 class="fw-bold mb-0">دسته‌بندی کاربران</h1>
-          <p class="text-muted mt-1">مدیریت دسته‌بندی‌ها و گروه‌بندی کاربران سیستم</p>
+          <h1 class="fw-bold mb-0">دسته بندی کاربران</h1>
+          <p class="text-muted mt-1">مدیریت دسته بندی ها و سطح دسترسی‌های کاربران سیستم</p>
+          <div v-if="selectedTr.length > 0" class="mt-2">
+            <small class="text-primary">
+              <i class="fa fa-check-circle me-1"></i>
+              مجموع {{ selectedTr.length }} سطر انتخاب شده
+            </small>
+          </div>
         </div>
-        <button class="btn btn-primary" @click="showAddCategoryModal = true">
-          <i class="bi bi-plus-circle me-1"></i>
-          افزودن دسته‌بندی
-        </button>
+        <div class="d-flex gap-2">
+          <button v-if="selectedTr.length > 0" class="btn btn-outline-danger btn-sm" @click="bulkDeleteSelected"
+            title="حذف گروهی">
+            <i class="fa fa-trash me-1"></i>
+            حذف گروهی ({{ selectedTr.length }})
+          </button>
+          <button class="btn btn-primary" @click="opencategoryModal('create')">
+            <i class="fa fa-plus-circle me-1"></i>
+            افزودن دسته بندی
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Search and Filter -->
-    <div class="card mb-4">
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <input
-              type="text"
-              class="form-control"
-              placeholder="جستجو بر اساس نام دسته..."
-              v-model="searchQuery"
-            />
+    <!-- جستجو -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <form @submit.prevent="searchCategories" class="mb-0">
+              <div class="row g-3">
+
+                <div class="col-md-4">
+                  <input type="text" class="form-control" placeholder="جستجو بر اساس عنوان دسته بندی..."
+                    v-model="searchQuery.title" />
+                </div>
+                <div class="col-md-3">
+                  <select class="form-select" v-model="searchQuery.status">
+                    <option value="1">لیست فعال</option>
+                    <option value="deleted">سطل زباله</option>
+                  </select>
+                </div>
+                <div class="col-md-2" v-if="Object.values(searchQuery).length">
+                  <button type="submit" class="btn border-success text-success mx-1">
+                    <i class="fa fa-search"></i>
+                  </button>
+                  <button type="button" class="btn border-warning text-warning mx-1" @click="resetFilters">
+                    <i class="fa fa-times"></i>
+                  </button>
+                </div>
+
+              </div>
+            </form>
           </div>
-          <div class="col-md-3">
-            <select class="form-select" v-model="statusFilter">
-              <option value="">همه وضعیت‌ها</option>
-              <option value="active">فعال</option>
-              <option value="inactive">غیرفعال</option>
-            </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- جدول دسته‌بندی‌ها -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body p-0">
+            <!-- Loading State -->
+            <div v-if="loading" class="text-center py-5">
+              <div class="spinner-border text-primary spinner-border-sm" role="status">
+                <span class="visually-hidden">در حال بارگذاری...</span>
+              </div>
+            </div>
+
+            <!-- Error State -->
+            <div v-else-if="error" class="alert alert-danger m-3" role="alert">
+              <i class="fa fa-exclamation-triangle me-2"></i>
+              {{ error }}
+              <button class="btn btn-sm btn-outline-danger ms-2" @click="getData()">
+                <i class="fa fa-arrow-clockwise"></i>
+                تلاش مجدد
+              </button>
+            </div>
+
+            <!-- Table -->
+            <div v-else class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th width="15%">شناسه</th>
+                    <th width="">عنوان</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(category, index) in categories" :key="category.id"
+                    :class="getRowClass(category.id, index)" @click="setCurrentRow(index)">
+                    <td @click="toggleRowSelectionById(category.id)">
+                      <input type="checkbox" v-if="selectedTr.includes(category.id)" checked
+                        class="form-check-input me-2">
+                      <a href="javascript:;" v-else class="text-decoration-none">{{ category.id }}</a>
+                    </td>
+                    <td>
+                      {{ category.title }}
+                      <div class="actionBTN btn-group btn-group-sm float-end">
+                        <div v-if="category.deleted_at">
+                          <button class="btn text-warning btn-sm" @click="openDeleteModal(category, 'restore')"
+                            title="بازیافت">
+                            <i class="fa fa-refresh"></i>
+                          </button>
+                          <button class="btn text-danger btn-sm" @click="openDeleteModal(category, 'delete')"
+                            title="حذف برای همیشه">
+                            <i class="fa fa-times"></i>
+                          </button>
+                        </div>
+                        <div v-else>
+                          <button class="btn text-primary btn-sm" @click="editcategory(category)" title="ویرایش">
+                            <i class="fa fa-pencil"></i>
+                          </button>
+                          <button class="btn text-danger btn-sm" @click="openDeleteModal(category)" title="حذف">
+                            <i class="fa fa-times"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="categories.length === 0">
+                    <td colspan="2" class="text-center py-4 text-muted">
+                      <i class="fa fa-folder-open fa-2x mb-2"></i>
+                      <div>هیچ دسته‌بندی یافت نشد</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="card-footer" v-if="totalItems > itemsPerPage">
+              <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                  <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                    <a class="page-link" href="javascript:;" @click="getData(currentPage - 1)"
+                      v-if="currentPage > 1">قبلی</a>
+                  </li>
+                  <li class="page-item" :class="{ active: page === currentPage }" v-for="page in totalPages"
+                    :key="page">
+                    <a class="page-link" href="javascript:;" @click="getData(page)">{{ page }}</a>
+                  </li>
+                  <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                    <a class="page-link" href="javascript:;" @click="getData(currentPage + 1)"
+                      v-if="currentPage < totalPages">بعدی</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
           </div>
-          <div class="col-md-3">
-            <select class="form-select" v-model="sortBy">
-              <option value="name">مرتب‌سازی بر اساس نام</option>
-              <option value="createdAt">مرتب‌سازی بر اساس تاریخ</option>
-              <option value="userCount">مرتب‌سازی بر اساس تعداد کاربر</option>
-            </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- category Modal (Create/Edit/View) -->
+    <div class="modal fade" :class="{ show: showcategoryModal }"
+      :style="{ display: showcategoryModal ? 'block' : 'none' }" tabindex="-1">
+      <div class="shadow" @click="showcategoryModal = false; currentcategory = null"></div>
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title">
+              <span v-if="modalMode === 'create'">افزودن دسته بندی جدید</span>
+              <span v-else-if="modalMode === 'edit'">ویرایش دسته بندی</span>
+              <span v-else-if="modalMode === 'view'">مشاهده دسته بندی</span>
+            </h5>
+            <button type="button" class="btn-close" @click="showcategoryModal = false; currentcategory = null"></button>
           </div>
-          <div class="col-md-2">
-            <button class="btn btn-outline-secondary w-100" @click="resetFilters">
-              پاک کردن فیلترها
+          <div class="modal-body">
+            <div class="card-title">
+              <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
+            </div>
+
+            <form @submit.prevent="modalMode !== 'view' ? savecategory() : null" v-if="currentcategory">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">نام دسته بندی *</label>
+                  <input type="text" class="form-control" v-model="currentcategory.title"
+                    :readonly="modalMode === 'view'" ref="categoryTitleInput" required />
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer" v-if="formloading">
+            درحال بارگذاری ....
+            <div class="spinner-border btn btn-secondary" category="status"></div>
+          </div>
+          <div class="modal-footer" v-else-if="modalMode !== 'view'">
+            <button type="button" class="btn btn-secondary"
+              @click="showcategoryModal = false; currentcategory = null">انصراف</button>
+            <button type="button" class="btn btn-primary" @click="savecategory">
+              <span v-if="modalMode === 'create'">افزودن دسته بندی</span>
+              <span v-else-if="modalMode === 'edit'">به‌روزرسانی دسته بندی</span>
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Categories Table -->
-    <div class="card">
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-hover">
-            <thead>
-              <tr>
-                <th>نام دسته</th>
-                <th>توضیحات</th>
-                <th>تعداد کاربران</th>
-                <th>وضعیت</th>
-                <th>تاریخ ایجاد</th>
-                <th>عملیات</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="category in filteredCategories" :key="category.id">
-                <td>
-                  <div class="d-flex align-items-center">
-                    <div class="category-icon me-3" :style="{ backgroundColor: category.color }">
-                      <i :class="category.icon" class="text-white"></i>
-                    </div>
-                    <div>
-                      <div class="fw-semibold">{{ category.name }}</div>
-                      <small class="text-muted">{{ category.slug }}</small>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span class="text-truncate d-inline-block" style="max-width: 200px;" :title="category.description">
-                    {{ category.description }}
-                  </span>
-                </td>
-                <td>
-                  <span class="badge bg-info">{{ category.userCount }}</span>
-                </td>
-                <td>
-                  <span class="badge" :class="getStatusBadgeClass(category.status)">
-                    {{ getStatusLabel(category.status) }}
-                  </span>
-                </td>
-                <td>{{ formatDate(category.createdAt) }}</td>
-                <td>
-                  <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary" @click="editCategory(category)" title="ویرایش">
-                      <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-outline-info" @click="viewCategory(category)" title="مشاهده">
-                      <i class="bi bi-eye"></i>
-                    </button>
-                    <button class="btn btn-outline-danger" @click="deleteCategory(category)" title="حذف">
-                      <i class="bi bi-trash"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Pagination -->
-        <div class="d-flex justify-content-between align-items-center mt-3">
-          <div class="text-muted">
-            نمایش {{ (currentPage - 1) * itemsPerPage + 1 }} تا {{ Math.min(currentPage * itemsPerPage, filteredCategories.length) }} از {{ filteredCategories.length }} دسته‌بندی
-          </div>
-          <nav>
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                <a class="page-link" href="#" @click.prevent="currentPage--" v-if="currentPage > 1">قبلی</a>
-              </li>
-              <li class="page-item" :class="{ active: page === currentPage }" v-for="page in totalPages" :key="page">
-                <a class="page-link" href="#" @click.prevent="currentPage = page">{{ page }}</a>
-              </li>
-              <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-                <a class="page-link" href="#" @click.prevent="currentPage++" v-if="currentPage < totalPages">بعدی</a>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Category Modal -->
-    <div class="modal fade" :class="{ show: showAddCategoryModal }" :style="{ display: showAddCategoryModal ? 'block' : 'none' }" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">افزودن دسته‌بندی جدید</h5>
-            <button type="button" class="btn-close" @click="showAddCategoryModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <form @submit.prevent="addCategory">
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label">نام دسته‌بندی *</label>
-                  <input type="text" class="form-control" v-model="newCategory.name" required />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">نامک (Slug)</label>
-                  <input type="text" class="form-control" v-model="newCategory.slug" placeholder="auto-generated" readonly />
-                </div>
-                <div class="col-12">
-                  <label class="form-label">توضیحات</label>
-                  <textarea class="form-control" rows="3" v-model="newCategory.description"></textarea>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">رنگ</label>
-                  <input type="color" class="form-control" v-model="newCategory.color" />
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">آیکون</label>
-                  <select class="form-select" v-model="newCategory.icon">
-                    <option value="bi bi-circle-fill">دایره</option>
-                    <option value="bi bi-star-fill">ستاره</option>
-                    <option value="bi bi-heart-fill">قلب</option>
-                    <option value="bi bi-shield-fill">سپر</option>
-                    <option value="bi bi-gear-fill">چرخ‌دنده</option>
-                    <option value="bi bi-house-fill">خانه</option>
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">وضعیت</label>
-                  <select class="form-select" v-model="newCategory.status">
-                    <option value="active">فعال</option>
-                    <option value="inactive">غیرفعال</option>
-                  </select>
-                </div>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showAddCategoryModal = false">انصراف</button>
-            <button type="button" class="btn btn-primary" @click="addCategory">افزودن دسته‌بندی</button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-
-// Reactive data
-const searchQuery = ref('')
-const statusFilter = ref('')
-const sortBy = ref('name')
-const currentPage = ref(1)
-const itemsPerPage = ref(10)
-const showAddCategoryModal = ref(false)
-
-const newCategory = reactive({
-  name: '',
-  slug: '',
-  description: '',
-  color: '#007bff',
-  icon: 'bi bi-circle-fill',
-  status: 'active'
-})
-
-// Mock categories data
-const categories = ref([
-  {
-    id: 1,
-    name: 'مدیران سیستم',
-    slug: 'system-admins',
-    description: 'کاربرانی با دسترسی کامل به سیستم مدیریت',
-    color: '#dc3545',
-    icon: 'bi bi-shield-fill',
-    status: 'active',
-    userCount: 5,
-    createdAt: '2024-01-10T08:00:00Z'
-  },
-  {
-    id: 2,
-    name: 'ویرایشگران محتوا',
-    slug: 'content-editors',
-    description: 'کاربران مسئول ایجاد و ویرایش محتوای سایت',
-    color: '#ffc107',
-    icon: 'bi bi-pencil-fill',
-    status: 'active',
-    userCount: 12,
-    createdAt: '2024-01-15T10:30:00Z'
-  },
-  {
-    id: 3,
-    name: 'کاربران عادی',
-    slug: 'regular-users',
-    description: 'کاربران ثبت‌نام شده عادی سیستم',
-    color: '#6c757d',
-    icon: 'bi bi-person-fill',
-    status: 'active',
-    userCount: 245,
-    createdAt: '2024-01-01T00:00:00Z'
-  },
-  {
-    id: 4,
-    name: 'نویسندگان مهمان',
-    slug: 'guest-writers',
-    description: 'نویسندگان مهمان با دسترسی محدود',
-    color: '#17a2b8',
-    icon: 'bi bi-pen-fill',
-    status: 'active',
-    userCount: 8,
-    createdAt: '2024-02-01T14:20:00Z'
-  },
-  {
-    id: 5,
-    name: 'کاربران ویژه',
-    slug: 'premium-users',
-    description: 'کاربران دارای اشتراک ویژه',
-    color: '#28a745',
-    icon: 'bi bi-star-fill',
-    status: 'inactive',
-    userCount: 0,
-    createdAt: '2024-03-01T09:15:00Z'
-  }
-])
-
-// Computed properties
-const filteredCategories = computed(() => {
-  let filtered = categories.value
-
-  if (searchQuery.value) {
-    filtered = filtered.filter(category =>
-      category.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      category.description.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-  }
-
-  if (statusFilter.value) {
-    filtered = filtered.filter(category => category.status === statusFilter.value)
-  }
-
-  // Sort
-  filtered.sort((a, b) => {
-    switch (sortBy.value) {
-      case 'name':
-        return a.name.localeCompare(b.name, 'fa')
-      case 'createdAt':
-        return new Date(b.createdAt) - new Date(a.createdAt)
-      case 'userCount':
-        return b.userCount - a.userCount
-      default:
-        return 0
-    }
-  })
-
-  return filtered
-})
-
-const totalPages = computed(() => {
-  return Math.ceil(filteredCategories.value.length / itemsPerPage.value)
-})
-
-// Methods
-const getStatusLabel = (status) => {
-  const labels = {
-    active: 'فعال',
-    inactive: 'غیرفعال'
-  }
-  return labels[status] || status
-}
-
-const getStatusBadgeClass = (status) => {
-  const classes = {
-    active: 'bg-success',
-    inactive: 'bg-secondary'
-  }
-  return classes[status] || 'bg-secondary'
-}
-
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('fa-IR')
-}
-
-const resetFilters = () => {
-  searchQuery.value = ''
-  statusFilter.value = ''
-  sortBy.value = 'name'
-  currentPage.value = 1
-}
-
-const addCategory = () => {
-  if (!newCategory.name.trim()) return
-
-  // Generate slug if empty
-  if (!newCategory.slug) {
-    newCategory.slug = newCategory.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]/g, '')
-  }
-
-  const category = {
-    id: categories.value.length + 1,
-    ...newCategory,
-    userCount: 0,
-    createdAt: new Date().toISOString()
-  }
-
-  categories.value.push(category)
-
-  // Reset form
-  Object.assign(newCategory, {
-    name: '',
-    slug: '',
-    description: '',
-    color: '#007bff',
-    icon: 'bi bi-circle-fill',
-    status: 'active'
-  })
-
-  showAddCategoryModal.value = false
-  alert('دسته‌بندی با موفقیت اضافه شد!')
-}
-
-const editCategory = (category) => {
-  alert(`ویرایش دسته‌بندی: ${category.name}`)
-}
-
-const viewCategory = (category) => {
-  alert(`مشاهده دسته‌بندی: ${category.name}`)
-}
-
-const deleteCategory = (category) => {
-  if (confirm(`آیا از حذف دسته‌بندی "${category.name}" اطمینان دارید؟`)) {
-    categories.value = categories.value.filter(c => c.id !== category.id)
-  }
-}
-
-// Watch for name changes to auto-generate slug
-watch(() => newCategory.name, (newName) => {
-  if (newName) {
-    newCategory.slug = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]/g, '')
-  }
-})
+import Swal from 'sweetalert2'
 
 definePageMeta({
   layout: 'dashboard',
   middleware: 'auth',
-  title: 'دسته‌بندی کاربران - CMS Panel'
+  title: 'دسته بندی کاربران'
 })
+const { $api } = useNuxtApp()
+
+// داده‌های دسته‌بندی
+const categories = ref([])
+
+// وضعیت بارگذاری
+const loading = ref(false)
+
+// خطا
+const error = ref(null)
+
+// pagination
+const totalItems = ref(0)
+const totalPages = ref(0)
+const currentPage = ref(1)
+
+const itemsPerPage = ref(10)
+
+// جستجو
+const searchQuery = ref([])
+
+// انتخاب سطرها
+const selectedTr = ref([])
+
+// شاخص سطر فعلی
+const currentRowIndex = ref(-1)
+
+const formloading = ref(false)
+const formError = ref(null)
+
+const showcategoryModal = ref(false)
+const modalMode = ref('create') /* 'create', 'edit', 'view' */
+const currentcategory = ref(null)
+const categoryTitleInput = ref(null)
+
+// تابع بارگذاری داده‌ها
+const getData = async (page = 1, searchParams = {}) => {
+  loading.value = true
+  error.value = null
+
+  try {
+    let url = `/users/categories?limit=${itemsPerPage.value}&page=${page}`
+    if (searchParams.title && searchParams.title.trim()) url += `&title=${encodeURIComponent(searchParams.title)}`
+    if (searchParams.status) url += `&status=${encodeURIComponent(searchParams.status)}`
+
+    const response = await $api(url)
+    console.log('API Response:', response)
+
+    // اطمینان از اینکه داده‌ها همیشه آرایه هستند
+    const data = response?.data || {}
+    categories.value = Array.isArray(data.items) ? data.items : []
+    totalItems.value = data.total || 0
+    totalPages.value = data.last_page || 0
+    currentPage.value = data.current_page || 1
+
+    selectedTr.value = []
+    currentRowIndex.value = -1 // هیچ سطری انتخاب نشده
+
+  } catch (err) {
+    console.error('Error loading categories:', err)
+    console.error('Error details:', err.response?.data || err.message)
+    error.value = 'خطا در بارگذاری لیست دسته‌بندی‌ها'
+    // در صورت خطا، آرایه‌ها را خالی کنیم
+    categories.value = []
+    totalItems.value = 0
+    totalPages.value = 0
+    currentPage.value = 1
+  } finally {
+    loading.value = false
+  }
+}
+
+// Keyboard navigation setup
+const setupKeyboardNavigation = () => {
+  const handleKeyDown = (event) => {
+    // اگر فوکوس روی input یا textarea باشد، کلیدها را پردازش نکن
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+      return
+    }
+
+    switch (event.key) {
+      case 'ArrowUp':
+        event.preventDefault()
+        navigateRows(-1)
+        break
+      case 'ArrowDown':
+        event.preventDefault()
+        navigateRows(1)
+        break
+      case ' ':
+        event.preventDefault()
+        toggleCurrentRowSelection()
+        break
+      case 'Enter':
+        event.preventDefault()
+        performCurrentRowAction()
+        break
+    }
+  }
+
+  // اضافه کردن event listener
+  document.addEventListener('keydown', handleKeyDown)
+
+  // پاک کردن event listener هنگام unmount
+  onUnmounted(() => {
+    document.removeEventListener('keydown', handleKeyDown)
+  })
+}
+
+const navigateRows = (direction) => {
+  const totalRows = categories.value.length
+  if (totalRows === 0) return
+
+  // اگر هیچ سطری انتخاب نشده، اولین حرکت کاربر را به اولین سطر ببر
+  if (currentRowIndex.value === -1) {
+    currentRowIndex.value = direction > 0 ? 0 : totalRows - 1
+    return
+  }
+
+  // حرکت به سطر بعدی/قبلی
+  currentRowIndex.value += direction
+
+  // محدود کردن به محدوده مجاز
+  if (currentRowIndex.value < 0) {
+    currentRowIndex.value = 0
+  } else if (currentRowIndex.value >= totalRows) {
+    currentRowIndex.value = totalRows - 1
+  }
+}
+
+const toggleCurrentRowSelection = () => {
+  if (currentRowIndex.value === -1 || !categories.value[currentRowIndex.value]) return
+
+  const categoryId = categories.value[currentRowIndex.value].id
+  toggleRowSelection(selectedTr, categoryId)
+}
+
+const performCurrentRowAction = () => {
+  if (currentRowIndex.value === -1 || !categories.value[currentRowIndex.value]) return
+
+  const category = categories.value[currentRowIndex.value]
+  editcategory(category)
+}
+
+const newcategory = reactive({
+  title: ''
+})
+
+
+onMounted(() => {
+  getData() // بارگذاری دسته‌بندی‌ها
+  setupKeyboardNavigation()
+})
+
+// حذف گروهی
+const bulkDeleteSelected = async () => {
+  if (selectedTr.value.length === 0) return
+
+  const result = await Swal.fire({
+    title: 'تأیید حذف گروهی',
+    text: `آیا مطمئن هستید که می‌خواهید ${selectedTr.value.length} دسته‌بندی انتخاب شده را حذف کنید؟`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'بله، حذف کن',
+    cancelButtonText: 'لغو',
+    reverseButtons: true,
+    customClass: {
+      popup: 'swal-rtl'
+    }
+  })
+
+  if (!result.isConfirmed) return
+
+  await performBulkDelete(selectedTr, categories, () => getData())
+}
+
+// تابع کمکی برای حذف گروهی
+const performBulkDelete = async (selectedItems, categoriesArray, refreshCallback) => {
+  formloading.value = true
+  let successCount = 0
+  let errorCount = 0
+
+  for (const categoryId of selectedItems.value) {
+    try {
+      await $api(`/users/categories/${categoryId}`, {
+        method: 'DELETE'
+      })
+      successCount++
+    } catch (err) {
+      console.error(`Error deleting category ${categoryId}:`, err)
+      errorCount++
+    }
+  }
+
+  // پاک کردن لیست انتخاب شده
+  selectedItems.value = []
+
+  // به‌روزرسانی لیست
+  if (refreshCallback) {
+    await refreshCallback()
+  }
+
+  // نمایش نتیجه
+  if (errorCount === 0) {
+    await Swal.fire({
+      title: 'انجام شد!',
+      text: `${successCount} دسته‌بندی با موفقیت حذف شد.`,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  } else {
+    await Swal.fire({
+      title: 'عملیات نیمه کامل',
+      text: `${successCount} دسته‌بندی حذف شد. ${errorCount} دسته‌بندی با خطا مواجه شد.`,
+      icon: 'warning',
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  }
+
+  formloading.value = false
+}
+
+// تابع عمومی برای انتخاب سطرها
+const toggleRowSelection = (selectedItems, categoryId) => {
+  const index = selectedItems.value.indexOf(categoryId)
+  if (index > -1) {
+    selectedItems.value.splice(index, 1)
+  } else {
+    selectedItems.value.push(categoryId)
+  }
+}
+
+// تابع انتخاب سطر
+const toggleRowSelectionById = (categoryId) => {
+  toggleRowSelection(selectedTr, categoryId)
+}
+
+const getRowClass = (categoryId, index) => {
+  const classes = []
+  if (selectedTr.value.includes(categoryId)) classes.push('selected')
+  if (index === currentRowIndex.value) classes.push('current-row')
+  return classes.join(' ')
+}
+
+const setCurrentRow = (rowIndex) => {
+  currentRowIndex.value = rowIndex
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  let dateinit = new Date(dateString)
+  let date = dateinit.toLocaleDateString('fa-IR')
+  let time = dateinit.toLocaleTimeString('fa-IR')
+  return `${date} <span class="text-muted">${time}</span>`
+}
+
+const searchCategories = () => {
+  const params = {
+    title: searchQuery.value.title,
+    status: searchQuery.value.status
+  }
+  getData(currentPage.value, params)
+}
+
+const resetFilters = () => {
+  searchQuery.value = []
+  selectedTr.value = []
+  currentRowIndex.value = -1
+  getData(currentPage.value)
+}
+
+
+const savecategory = async () => {
+  if (!currentcategory.value.title.trim()) {
+    formError.value = 'عنوان دسته بندی الزامی است'
+    return
+  }
+
+  formloading.value = true
+  formError.value = null
+
+  try {
+    const categoryData = {
+      title: currentcategory.value.title
+    }
+
+    let response
+    if (modalMode.value === 'create') {
+      response = await $api('/users/categories', {
+        method: 'POST',
+        body: categoryData
+      })
+
+      if (response?.data) {
+        const newCategory = response.data
+        categories.value.unshift(newCategory)
+      }
+    } else if (modalMode.value === 'edit') {
+      response = await $api(`/users/categories/${currentcategory.value.id}`, {
+        method: 'PUT',
+        body: categoryData
+      })
+
+      if (response?.data) {
+        const updatedCategory = response.data
+
+        // حذف از لیست فعلی
+        const index = categories.value.findIndex(cat => cat.id === updatedCategory.id)
+        if (index !== -1) {
+          categories.value.splice(index, 1)
+        }
+
+        // اضافه کردن به ابتدای لیست
+        categories.value.unshift(updatedCategory)
+      }
+    }
+
+    showcategoryModal.value = false
+    currentcategory.value = null
+
+  } catch (err) {
+    const status = err?.response?.status
+    const data = err?.response?._data
+
+    if (status === 422 && data?.errors) {
+      formError.value = Object.values(data.errors)
+        .flat()
+        .join(' ، ')
+    }
+    else if (data?.message) {
+      formError.value = "خطایی رخ داده لطفا با پشتیبانی تماس بگیرید"
+    }
+    else {
+      formError.value = 'خطایی در ارتباط با سرور رخ داد'
+    }
+  } finally {
+    formloading.value = false
+  }
+}
+
+
+const opencategoryModal = async (mode = 'create', category = null) => {
+  modalMode.value = mode
+  formError.value = null
+
+  if (mode === 'create') {
+    currentcategory.value = {
+      title: ''
+    }
+  } else if (category) {
+    currentcategory.value = { ...category }
+  }
+
+  showcategoryModal.value = true
+
+  await nextTick()
+  if (categoryTitleInput.value) {
+    categoryTitleInput.value.focus()
+  }
+}
+
+const editcategory = (category) => {
+  opencategoryModal('edit', category)
+}
+
+const viewcategory = (category) => {
+  opencategoryModal('view', category)
+}
+
+
+
+const openDeleteModal = async (category, method = '') => {
+  let title, text, icon, confirmButtonText, confirmButtonColor
+
+  if (method === 'restore') {
+    title = 'بازیابی دسته بندی'
+    text = `آیا می‌خواهید دسته بندی "${category.title}" را بازیابی کنید؟`
+    icon = 'question'
+    confirmButtonText = 'بله، بازیابی کن'
+    confirmButtonColor = '#28a745'
+  } else if (method === 'delete') {
+    title = 'حذف کامل دسته بندی'
+    text = `آیا مطمئن هستید که می‌خواهید دسته بندی "${category.title}" را برای همیشه حذف کنید؟ این عمل قابل برگشت نیست!`
+    icon = 'error'
+    confirmButtonText = 'بله، برای همیشه حذف کن'
+    confirmButtonColor = '#dc3545'
+  } else {
+    title = 'حذف دسته بندی'
+    text = `آیا می‌خواهید دسته بندی "${category.title}" را حذف کنید؟`
+    icon = 'warning'
+    confirmButtonText = 'بله، حذف کن'
+    confirmButtonColor = '#dc3545'
+  }
+
+  const result = await Swal.fire({
+    title,
+    text,
+    icon,
+    showCancelButton: true,
+    confirmButtonColor,
+    cancelButtonColor: '#6c757d',
+    confirmButtonText,
+    cancelButtonText: 'لغو',
+    reverseButtons: true,
+    customClass: {
+      popup: 'swal-rtl'
+    }
+  })
+
+  if (result.isConfirmed) {
+    await confirmDelete(category, method)
+  }
+}
+
+const confirmDelete = async (category, method = '') => {
+  formloading.value = true
+  error.value = null
+
+  try {
+    let url, httpMethod, successMessage
+
+    if (method === 'restore') {
+      url = `/users/categories/${category.id}/restore`
+      httpMethod = 'PATCH'
+      successMessage = 'دسته بندی با موفقیت بازیابی شد!'
+    } else if (method === 'delete') {
+      url = `/users/categories/${category.id}/force`
+      httpMethod = 'DELETE'
+      successMessage = 'دسته بندی برای همیشه حذف شد!'
+    } else {
+      url = `/users/categories/${category.id}`
+      httpMethod = 'DELETE'
+      successMessage = 'دسته بندی با موفقیت حذف شد!'
+    }
+
+    await $api(url, {
+      method: httpMethod
+    })
+
+    // حذف از لیست
+    const filtered = categories.value.filter(cat => cat.id !== category.id)
+    categories.value = filtered
+
+    // نمایش پیام موفقیت
+    await Swal.fire({
+      title: 'انجام شد!',
+      text: successMessage,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+
+  } catch (err) {
+    console.error('Error deleting category:', err)
+    const status = err?.response?.status
+    const data = err?.response?._data
+    let errorMessage = 'خطا در عملیات'
+
+    if (status === 404) {
+      errorMessage = 'دسته بندی یافت نشد'
+    } else if (status === 403) {
+      errorMessage = 'شما دسترسی انجام این عملیات را ندارید'
+    } else if (data?.message) {
+      errorMessage = data.message
+    }
+
+    await Swal.fire({
+      title: 'خطا!',
+      text: errorMessage,
+      icon: 'error',
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  } finally {
+    formloading.value = false
+  }
+}
+
 </script>
-
-<style scoped>
-.category-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-}
-
-.table th {
-  font-weight: 600;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.page-link {
-  color: #0d6efd;
-}
-
-.page-item.active .page-link {
-  background-color: #0d6efd;
-  border-color: #0d6efd;
-}
-</style>
