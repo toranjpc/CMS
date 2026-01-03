@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Modules\User\Database\factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         "f_id",
@@ -20,7 +21,7 @@ class User extends Authenticatable
         "name",
         "lastname",
         "birth",
-        "alias",
+        // "alias",
         "username",
         "mobile",
         "password",
@@ -30,16 +31,17 @@ class User extends Authenticatable
         "status",
     ];
 
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
-
     protected $casts = [
         'mobile_verified_at' => 'datetime',
+        'birth' => 'date',
         'per' => 'array',
         'datas' => 'array',
         'password' => 'hashed',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
     ];
 
 
@@ -52,29 +54,35 @@ class User extends Authenticatable
     public function reagent()
     {
         return $this->belongsTo(User::class, 'f_id', 'id')
-            ->select('id', 'name', 'lastname', 'alias');
+            ->select('id', 'name', 'lastname');
     }
 
     public function category()
     {
-        return $this->hasOne(ExtData::class, 'f_id', 'id')
-            // ->select('f_id', 'm_id')
-            ->where('kind', 'UserCategory')
-            ->with(['om' => function ($q) {
-                $q->where('options.kind', 'Category');
-            }]);
+        return $this->hasOneThrough(
+            Option::class,
+            ExtData::class,
+            'f_id',     // ExtData.f_id -> User.id
+            'id',       // Option.id -> ExtData.m_id  
+            'id',       // User.id
+            'm_id'      // ExtData.m_id -> Option.id
+        )->where('extdatas.kind', 'UserCategory')
+            ->where('options.kind', 'Category');
     }
     public function userPlan()
     {
-        return $this->hasOne(ExtData::class, 'f_id', 'id')
-            // ->select('f_id', 'm_id')
-            ->where('kind', 'UserPlan')
-            ->where('status', 1)
-            ->latest('id')
-            ->with(['om' => function ($q) {
-                $q->where('options.kind', 'Plan');
-            }]);
+        return $this->hasOneThrough(
+            Option::class,
+            ExtData::class,
+            'f_id',     // ExtData.f_id -> User.id
+            'id',       // Option.id -> ExtData.m_id  
+            'id',       // User.id
+            'm_id'      // ExtData.m_id -> Option.id
+        )->where('extdatas.kind', 'UserPlan')
+            ->where('extdatas.status', 1)
+            ->where('options.kind', 'Plan');
     }
+
     public function userPlans()
     {
         return $this->belongsToMany(Option::class, 'extdatas', 'f_id', 'm_id')

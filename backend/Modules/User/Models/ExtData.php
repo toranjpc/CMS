@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class ExtData extends Model
 {
     use HasFactory;
-
+    protected $table = 'extdatas';
 
     protected $fillable = [
         'f_id',

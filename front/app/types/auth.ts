@@ -1,14 +1,15 @@
+// User interface
 export interface User {
   id: number
-  name: string
   mobile: string
   email?: string
-  roles?: string[]
+  name: string
   permissions?: string[]
-  created_at?: string
-  updated_at?: string
+  roles?: string[]
+  [key: string]: any // For additional user properties from API
 }
 
+// Auth state interface
 export interface AuthState {
   user: User | null
   token: string | null
@@ -16,29 +17,16 @@ export interface AuthState {
   loading: boolean
 }
 
+// Login credentials interface
 export interface LoginCredentials {
   mobile: string
   password: string
   remember?: boolean
 }
 
+// Auth response interface
 export interface AuthResponse {
   success: boolean
-  token?: string
   user?: User
   message?: string
-  errors?: Record<string, string[]>
 }
-
-export interface ValidationResult {
-  isValid: boolean
-  score: number
-  feedback: string[]
-}
-
-export interface ApiError {
-  message: string
-  errors?: Record<string, string[]>
-  status?: number
-}
-

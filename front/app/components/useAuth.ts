@@ -247,4 +247,3 @@ export const useAuth = () => {
   }
   return authInstance
 }
-

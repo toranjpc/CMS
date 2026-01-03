@@ -42,7 +42,7 @@
                 <option value="deleted">سطل زباله</option>
               </select>
             </div>
-            <div class="col-md-2" v-if="Object.values(searchQuery).length">
+            <div class="col-md-2" v-if="searchQuery.title || searchQuery.status !== '1'">
               <button type="submit" class="btn border-success text-success mx-1">
                 <i class="fa fa-search"></i>
               </button>
@@ -145,16 +145,18 @@
           <nav>
             <ul class="pagination pagination-sm mb-0">
               <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                <a class="page-link" href="javascript:;" @click="getData(itemsPerPage, currentPage - 1)"
-                  v-if="currentPage > 1">قبلی</a>
+                <a class="page-link" href="javascript:;"
+                  @click="getData(itemsPerPage, currentPage - 1, 0, getSearchParams())" v-if="currentPage > 1">قبلی</a>
               </li>
 
               <li class="page-item" :class="{ active: page === currentPage }" v-for="page in totalPages" :key="page">
-                <a class="page-link" href="javascript:;" @click="getData(itemsPerPage, page)">{{ page }}</a>
+                <a class="page-link" href="javascript:;" @click="getData(itemsPerPage, page, 0, getSearchParams())">{{
+                  page }}</a>
               </li>
 
               <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-                <a class="page-link" href="javascript:;" @click="getData(itemsPerPage, parseInt(currentPage) + 1)"
+                <a class="page-link" href="javascript:;"
+                  @click="getData(itemsPerPage, parseInt(currentPage) + 1, 0, getSearchParams())"
                   v-if="currentPage < totalPages">بعدی</a>
               </li>
             </ul>
@@ -166,7 +168,7 @@
     <!-- Role Modal (Create/Edit/View) -->
     <div class="modal fade" :class="{ show: showRoleModal }" :style="{ display: showRoleModal ? 'block' : 'none' }"
       tabindex="-1">
-      <div class="shadow" @click="showRoleModal = false; currentRole = null"></div>
+      <div class="shadow" @click="showRoleModal = false; /*currentRole = null*/"></div>
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header bg-info text-white">
@@ -263,7 +265,10 @@ const totalitems = ref(0)
 const totalPages = ref(0)
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
-const searchQuery = ref([])
+const searchQuery = ref({
+  title: '',
+  status: '1'
+})
 const selectedTr = ref([])
 const currentRowIndex = ref(-1)
 
@@ -273,18 +278,20 @@ const currentRole = ref(null)
 const roleTitleInput = ref(null)
 const availablePermissions = ref([])
 
-const getData = async (iPP, cP, wP = 0) => {
+const getData = async (iPP, cP, wP = 0, searchParams = {}) => {
   loading.value = true
   error.value = null
 
   try {
     let url = `/users/jobs?withPers=${wP}&limit=${iPP}&page=${cP}`
 
-    const keys = Object.keys(searchQuery.value)
+    // استفاده از پارامترهای جستجو ارسالی یا پارامترهای فعلی
+    const paramsToUse = Object.keys(searchParams).length ? searchParams : searchQuery.value
+    const keys = Object.keys(paramsToUse)
     if (keys.length) {
       const queryString = keys
-        .filter(key => searchQuery.value[key] !== '' && searchQuery.value[key] !== null && searchQuery.value[key] !== undefined)
-        .map(key => `${key}=${encodeURIComponent(searchQuery.value[key])}`)
+        .filter(key => paramsToUse[key] !== '' && paramsToUse[key] !== null && paramsToUse[key] !== undefined)
+        .map(key => `${key}=${encodeURIComponent(paramsToUse[key])}`)
         .join('&')
       url += "&" + queryString
     }
@@ -355,10 +362,7 @@ const setupKeyboardNavigation = () => {
         break
       case 'Enter':
         event.preventDefault()
-        // Enter روی سطر فعلی کلیک می‌کند
-        if (currentRowIndex.value >= 0 && roles.value[currentRowIndex.value]) {
-          // می‌توانیم اینجا عملیات خاصی تعریف کنیم، مثلاً ویرایش
-        }
+        performCurrentRowAction()
         break
     }
   }
@@ -491,7 +495,12 @@ const bulkDeleteSelected = async () => {
 
   formloading.value = false
 }
+const performCurrentRowAction = () => {
+  if (currentRowIndex.value === -1 || !roles.value[currentRowIndex.value]) return
 
+  const selectedRole = roles.value[currentRowIndex.value]
+  editRole(selectedRole)
+}
 const permissionCategories = computed(() => {
   return [...new Set(availablePermissions.value.map(p => p.category))].sort()
 })
@@ -548,10 +557,24 @@ const searchFilters = () => {
   if (Object.keys(searchQuery.value).length) getData(itemsPerPage.value, currentPage.value, 0)
 }
 const resetFilters = () => {
-  searchQuery.value = []
+  searchQuery.value = {
+    title: '',
+    status: '1'
+  }
   selectedTr.value = []
   currentRowIndex.value = -1
   getData(itemsPerPage.value, currentPage.value, 0)
+}
+
+// تابع برای گرفتن پارامترهای جستجوی فعلی
+const getSearchParams = () => {
+  if (searchQuery.value && (searchQuery.value.title || searchQuery.value.status !== '1')) {
+    return {
+      title: searchQuery.value.title,
+      status: searchQuery.value.status
+    }
+  }
+  return {}
 }
 
 

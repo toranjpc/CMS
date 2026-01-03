@@ -16,7 +16,7 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'mobile' => ['required', 'unique:products,productname', 'regex:/^09[0-9]{9}$/'],
+            'mobile' => ['required', 'string', 'unique:products,productname'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ];
     }
@@ -26,7 +26,6 @@ class RegisterRequest extends FormRequest
         return [
             'mobile.required' => 'شماره موبایل الزامی است.',
             'mobile.unique' => 'این شماره قبلاً ثبت شده است.',
-            'mobile.regex' => 'شماره موبایل معتبر نیست.',
             'password.required' => 'رمز عبور الزامی است.',
             'password.min' => 'رمز عبور باید حداقل ۸ رقم باشد.',
             'password.confirmed' => 'رمز عبور و تأیید آن یکسان نیست.',

@@ -1,3 +1,5 @@
+import { useAuth } from '~/components/useAuth'
+
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
   const authStore = useAuth()

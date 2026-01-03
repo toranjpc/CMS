@@ -37,17 +37,17 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        Schema::create('productoptions', function (Blueprint $table) {
+        Schema::create('product_options', function (Blueprint $table) {
             $table->id();
 
             $table->unsignedBigInteger('f_id')->nullable();
-            $table->foreign('f_id')->references('id')->on('productoptions')->nullOnDelete();
+            $table->foreign('f_id')->references('id')->on('product_options')->nullOnDelete();
 
             $table->string('title')->nullable();
             $table->text('des')->nullable();
             $table->json('option')->nullable();
 
-            $table->enum('kind', ['category', 'option', 'warehouse'])->nullable();
+            $table->enum('kind', ['category', 'option', 'brand','unit'])->nullable();
             $table->unique(['title', 'f_id', 'kind']);
 
             $table->tinyInteger('status')->default(0);
@@ -62,6 +62,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('products');
-        Schema::dropIfExists('productoptions');
+        Schema::dropIfExists('product_options');
     }
 };

@@ -20,6 +20,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuth } from '~/components/useAuth'
 
 import AdminSidebar from '~/components/admin/Sidebar.vue'
 import AdminNavbar from '~/components/admin/Navbar.vue'

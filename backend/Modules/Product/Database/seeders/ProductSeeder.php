@@ -13,7 +13,7 @@ class ProductSeeder extends Seeder
 
     public function run()
     {
-        // DB::table('productoptions')->insert([
+        // DB::table('product_options')->insert([
         //     [
         //         'title' => 'ادمین کل',
         //         'kind' => 'ProductCategory',

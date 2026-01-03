@@ -25,8 +25,8 @@ Route::prefix('auth')->middleware('api')->group(function () {
 
 Route::prefix('users')
     ->name('users.')
-    ->middleware(['api', 'checkPermission'])
-    ->group(function () { //auth:sanctum
+    ->middleware(['api', 'checkPermission', 'auth:sanctum'])
+    ->group(function () { //
 
         Route::prefix('categories')->name('categories.')->group(function () {
             Route::get('/', [UserController::class, 'category_index'])->name('index');
@@ -49,8 +49,10 @@ Route::prefix('users')
         });
 
         Route::get('/', [UserController::class, 'index'])->name('index');
-        Route::get('{user}', [UserController::class, 'show'])->name('show');
+        Route::get('{id}', [UserController::class, 'show'])->name('show');
         Route::post('/', [UserController::class, 'store'])->name('store');
         Route::put('{user}', [UserController::class, 'update'])->name('update');
         Route::delete('{user}', [UserController::class, 'destroy'])->name('destroy');
+        Route::delete('{id}/force', [UserController::class, 'force_destroy'])->name('force_destroy');
+        Route::patch('{id}/restore', [UserController::class, 'restore'])->name('restore');
     });

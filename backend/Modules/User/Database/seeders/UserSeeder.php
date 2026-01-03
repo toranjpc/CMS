@@ -68,7 +68,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Admin',
                 'lastname' => 'User',
-                'alias' => 'کاربر تست',
+                // 'alias' => 'کاربر تست',
                 'username' => 'admin',
                 'password' => Hash::make('0012300123'),
                 'mobile' => "09120703611",

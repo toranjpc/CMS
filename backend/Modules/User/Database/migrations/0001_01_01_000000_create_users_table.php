@@ -49,11 +49,11 @@ return new class extends Migration
             $table->string('ircode')->default(0)->nullable();
             $table->string('name')->nullable();
             $table->string('lastname')->nullable();
-            $table->string('alias')->nullable();
+            // $table->string('alias')->nullable();
             $table->timestamp('birth')->nullable();
             $table->string('username')->nullable();
             $table->string('password')->nullable();
-            $table->string('mobile')->unique()->nullable();
+            $table->unsignedBigInteger('mobile')->unique()->nullable();
             $table->timestamp('mobile_verified_at')->nullable();
 
             $table->foreignId('job')->nullable()->constrained('options', 'id')->nullOnDelete();

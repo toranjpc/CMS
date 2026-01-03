@@ -95,6 +95,7 @@
 
 <script setup>
 import { validateMobile, loginRateLimiter } from '~/utils/security'
+import { useAuth } from '~/components/useAuth'
 
 const authStore = useAuth()
 

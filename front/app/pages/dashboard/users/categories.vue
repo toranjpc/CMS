@@ -31,7 +31,7 @@
       <div class="col-12">
         <div class="card">
           <div class="card-body">
-            <form @submit.prevent="searchCategories" class="mb-0">
+            <form @submit.prevent="searchCategories" class="mb-0" enctype='multipart/form-data'>
               <div class="row g-3">
 
                 <div class="col-md-4">
@@ -44,7 +44,7 @@
                     <option value="deleted">سطل زباله</option>
                   </select>
                 </div>
-                <div class="col-md-2" v-if="Object.values(searchQuery).length">
+                <div class="col-md-2" v-if="searchQuery.title || searchQuery.status !== '1'">
                   <button type="submit" class="btn border-success text-success mx-1">
                     <i class="fa fa-search"></i>
                   </button>
@@ -87,7 +87,8 @@
               <table class="table table-hover mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th width="15%">شناسه</th>
+                    <th width="10%">شناسه</th>
+                    <th width="15%">آیکون</th>
                     <th width="">عنوان</th>
                   </tr>
                 </thead>
@@ -98,6 +99,12 @@
                       <input type="checkbox" v-if="selectedTr.includes(category.id)" checked
                         class="form-check-input me-2">
                       <a href="javascript:;" v-else class="text-decoration-none">{{ category.id }}</a>
+                    </td>
+                    <td class="text-center">
+                      <div style="width: 40px; height: 40px; margin: 0 auto;">
+                        <img :src="getCategoryIconUrl(category.id, category.updated_at)" class="rounded border"
+                          style="width: 100%; height: 100%; object-fit: cover;" @error="onIconError" />
+                      </div>
                     </td>
                     <td>
                       {{ category.title }}
@@ -124,7 +131,7 @@
                     </td>
                   </tr>
                   <tr v-if="categories.length === 0">
-                    <td colspan="2" class="text-center py-4 text-muted">
+                    <td colspan="3" class="text-center py-4 text-muted">
                       <i class="fa fa-folder-open fa-2x mb-2"></i>
                       <div>هیچ دسته‌بندی یافت نشد</div>
                     </td>
@@ -138,15 +145,15 @@
               <nav>
                 <ul class="pagination pagination-sm justify-content-center mb-0">
                   <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                    <a class="page-link" href="javascript:;" @click="getData(currentPage - 1)"
+                    <a class="page-link" href="javascript:;" @click="getData(currentPage - 1, getSearchParams())"
                       v-if="currentPage > 1">قبلی</a>
                   </li>
                   <li class="page-item" :class="{ active: page === currentPage }" v-for="page in totalPages"
                     :key="page">
-                    <a class="page-link" href="javascript:;" @click="getData(page)">{{ page }}</a>
+                    <a class="page-link" href="javascript:;" @click="getData(page, getSearchParams())">{{ page }}</a>
                   </li>
                   <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-                    <a class="page-link" href="javascript:;" @click="getData(currentPage + 1)"
+                    <a class="page-link" href="javascript:;" @click="getData(currentPage + 1, getSearchParams())"
                       v-if="currentPage < totalPages">بعدی</a>
                   </li>
                 </ul>
@@ -160,7 +167,7 @@
     <!-- category Modal (Create/Edit/View) -->
     <div class="modal fade" :class="{ show: showcategoryModal }"
       :style="{ display: showcategoryModal ? 'block' : 'none' }" tabindex="-1">
-      <div class="shadow" @click="showcategoryModal = false; currentcategory = null"></div>
+      <div class="shadow" @click="showcategoryModal = false; /*currentcategory = null*/"></div>
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header bg-info text-white">
@@ -182,6 +189,27 @@
                   <label class="form-label">نام دسته بندی *</label>
                   <input type="text" class="form-control" v-model="currentcategory.title"
                     :readonly="modalMode === 'view'" ref="categoryTitleInput" required />
+                </div>
+                <div class="col-12" v-if="modalMode !== 'view'">
+                  <label class="form-label">آیکون دسته بندی</label>
+                  <input type="file" class="form-control" ref="categoryIconInput" accept="image/*,.svg"
+                    @change="handleIconUpload" />
+                  <div class="form-text">
+                    فرمت‌های مجاز: JPG, PNG, GIF, SVG, WebP
+                  </div>
+                  <div v-if="currentcategory.icon" class="mt-2">
+                    <small class="text-success">
+                      <i class="fa fa-check-circle me-1"></i>
+                      فایل انتخاب شده: {{ selectedFileName }}
+                    </small>
+                  </div>
+                </div>
+                <div class="col-12" v-if="modalMode === 'view'">
+                  <label class="form-label">آیکون دسته بندی</label>
+                  <div class="border rounded p-2 bg-light">
+                    <img :src="getCategoryIconUrl(currentcategory.id, category.updated_at)" class="img-thumbnail"
+                      style="max-width: 100px; max-height: 100px;" @error="onIconError" />
+                  </div>
                 </div>
               </div>
             </form>
@@ -215,6 +243,10 @@ definePageMeta({
 })
 const { $api } = useNuxtApp()
 
+const config = useRuntimeConfig()
+const baseUrl = config.public.apiBase
+
+
 // داده‌های دسته‌بندی
 const categories = ref([])
 
@@ -232,7 +264,10 @@ const currentPage = ref(1)
 const itemsPerPage = ref(10)
 
 // جستجو
-const searchQuery = ref([])
+const searchQuery = ref({
+  title: '',
+  status: '1'
+})
 
 // انتخاب سطرها
 const selectedTr = ref([])
@@ -247,6 +282,8 @@ const showcategoryModal = ref(false)
 const modalMode = ref('create') /* 'create', 'edit', 'view' */
 const currentcategory = ref(null)
 const categoryTitleInput = ref(null)
+const categoryIconInput = ref(null)
+const selectedFileName = ref('')
 
 // تابع بارگذاری داده‌ها
 const getData = async (page = 1, searchParams = {}) => {
@@ -486,10 +523,81 @@ const searchCategories = () => {
 }
 
 const resetFilters = () => {
-  searchQuery.value = []
+  searchQuery.value = {
+    title: '',
+    status: '1'
+  }
   selectedTr.value = []
   currentRowIndex.value = -1
   getData(currentPage.value)
+}
+
+// تابع برای گرفتن پارامترهای جستجوی فعلی
+const getSearchParams = () => {
+  if (searchQuery.value && (searchQuery.value.title || searchQuery.value.status)) {
+    return {
+      title: searchQuery.value.title,
+      status: searchQuery.value.status
+    }
+  }
+  return {}
+}
+
+// تابع مدیریت آپلود آیکون
+const handleIconUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    // بررسی اندازه فایل (حداکثر 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      formError.value = 'حجم فایل نباید بیشتر از ۲ مگابایت باشد'
+      event.target.value = ''
+      return
+    }
+
+    // بررسی فرمت فایل
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+    if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.svg')) {
+      formError.value = 'فرمت فایل مجاز نیست. لطفا از فرمت‌های JPG, PNG, GIF, WebP یا SVG استفاده کنید'
+      event.target.value = ''
+      return
+    }
+
+    selectedFileName.value = file.name
+    currentcategory.value.icon = file
+    formError.value = null
+  }
+}
+
+// تابع بررسی اینکه فایل تصویر است یا نه
+const isImageFile = (file) => {
+  if (typeof file === 'string') {
+    return file.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+  }
+  return file && file.type && file.type.startsWith('image/')
+}
+
+// تابع گرفتن نام فایل از URL یا File
+const getFileName = (file) => {
+  if (typeof file === 'string') {
+    return file.split('/').pop()
+  }
+  return file && file.name ? file.name : 'فایل نامشخص'
+}
+
+// تابع ساخت URL آیکون دسته‌بندی
+const getCategoryIconUrl = (categoryId, updated_at = 0) => {
+  return `${baseUrl}storage/users/categories/${categoryId}?v=${updated_at}`
+}
+
+// تابع مدیریت خطای بارگذاری آیکون
+const onIconError = (event) => {
+  event.target.style.display = 'none'
+  event.target.nextElementSibling?.remove()
+  const parent = event.target.parentElement
+  const placeholder = document.createElement('div')
+  placeholder.className = 'd-flex align-items-center justify-content-center h-100 text-muted'
+  placeholder.innerHTML = '<i class="fa fa-image" style="font-size: 16px;"></i>'
+  parent.appendChild(placeholder)
 }
 
 
@@ -503,15 +611,20 @@ const savecategory = async () => {
   formError.value = null
 
   try {
-    const categoryData = {
-      title: currentcategory.value.title
+    // استفاده از FormData برای ارسال فایل
+    const formData = new FormData()
+    formData.append('title', currentcategory.value.title)
+
+    // اضافه کردن فایل آیکون اگر انتخاب شده باشد
+    if (currentcategory.value.icon && currentcategory.value.icon instanceof File) {
+      formData.append('icon', currentcategory.value.icon)
     }
 
     let response
     if (modalMode.value === 'create') {
       response = await $api('/users/categories', {
         method: 'POST',
-        body: categoryData
+        body: formData
       })
 
       if (response?.data) {
@@ -520,21 +633,22 @@ const savecategory = async () => {
       }
     } else if (modalMode.value === 'edit') {
       response = await $api(`/users/categories/${currentcategory.value.id}`, {
-        method: 'PUT',
-        body: categoryData
+        method: 'POST', // تغییر به POST برای FormData
+        body: formData,
+        query: { _method: 'PUT' } // برای ارسال PUT از طریق POST
       })
+      console.log(response)
 
       if (response?.data) {
         const updatedCategory = response.data
 
-        // حذف از لیست فعلی
-        const index = categories.value.findIndex(cat => cat.id === updatedCategory.id)
-        if (index !== -1) {
-          categories.value.splice(index, 1)
+        if (response?.data) {
+          const index = categories.value.findIndex(cat => cat.id === updatedCategory.id)
+          if (index !== -1) {
+            categories.value[index] = response.data
+          }
         }
 
-        // اضافه کردن به ابتدای لیست
-        categories.value.unshift(updatedCategory)
       }
     }
 
@@ -565,10 +679,12 @@ const savecategory = async () => {
 const opencategoryModal = async (mode = 'create', category = null) => {
   modalMode.value = mode
   formError.value = null
+  selectedFileName.value = ''
 
   if (mode === 'create') {
     currentcategory.value = {
-      title: ''
+      title: '',
+      icon: null
     }
   } else if (category) {
     currentcategory.value = { ...category }
