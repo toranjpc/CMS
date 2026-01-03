@@ -388,20 +388,5 @@ watch(
   background: rgba(255, 255, 255, 0.15);
 }
 
-/* Accordion animation */
-li.open > a::after {
-  content: '▼';
-  margin-left: 0.5rem;
-  transition: transform 0.3s ease;
-}
 
-li:not(.open) > a::after {
-  content: '▶';
-  margin-left: 0.5rem;
-  transition: transform 0.3s ease;
-}
-
-.sidebar.collapsed li > a::after {
-  display: none;
-}
 </style>
