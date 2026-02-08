@@ -20,38 +20,58 @@ class UserController extends Controller
             // "userPlan",
             // "extraData",
             "jobOption:id,title"
-        ]);
+        ])->when(request('accountable', 0), function ($q) {
+            $q->where('is_accountable', 1);
+        });
 
-        if (!empty(request('sex'))) $users = $users->where('sex', request('sex') == "men" ? 1 : 0);
-        if (!empty(request('name'))) $users = $users->where('name', 'LIKE', '%' . request('name') . '%');
-        if (!empty(request('lastname'))) $users = $users->where('lastname', 'LIKE', '%' . request('lastname') . '%');
-        if (!empty(request('username'))) $users = $users->where('username', 'LIKE', '%' . request('username') . '%');
-        if (!empty(request('mobile'))) $users = $users->where('mobile', 'LIKE', '%' . request('mobile') . '%');
+        if (!empty(request('values'))) {
+            $values = request('values');
+            $users = $users->select('id', 'sex', 'name', 'lastname', 'mobile')->with('category');
+            $users = $users->where(function ($q) use ($values) {
+                $q->where('name', 'LIKE', '%' . $values . '%')
+                    ->orWhere('lastname', 'LIKE', '%' . $values . '%')
+                    ->orWhere('mobile', 'LIKE', '%' . $values . '%');
+            });
+        } else {
+            if (!empty(request('sex'))) $users = $users->where('sex', request('sex') == "men" ? 1 : 0);
+            if (!empty(request('name'))) $users = $users->where('name', 'LIKE', '%' . request('name') . '%');
+            if (!empty(request('lastname'))) $users = $users->where('lastname', 'LIKE', '%' . request('lastname') . '%');
+            if (!empty(request('username'))) $users = $users->where('username', 'LIKE', '%' . request('username') . '%');
+            if (!empty(request('mobile'))) $users = $users->where('mobile', 'LIKE', '%' . request('mobile') . '%');
+            if (!empty(request('status')) && request('status') == "deleted") $users = $users->onlyTrashed();
+        }
 
-        if (!empty(request('status')) && request('status') == "deleted") $users = $users->onlyTrashed();
         $users = $users->orderByDesc('id')->paginate(request("limit", 10));
-
-        $DATA = [
-            'items' => $users->items(),
-            'total' => $users->total(),
-            'per_page' => $users->perPage(),
-            'current_page' => $users->currentPage(),
-            'last_page' => $users->lastPage(),
-            'from' => $users->firstItem(),
-            'to' => $users->lastItem(),
-        ];
         return response()->json(
             [
                 "status" => "success",
-                "data" => $DATA
+                "items" => $users
             ],
             200
         );
     }
 
-    public function show($id)
+    public function show($userId = 0)
     {
-        return response()->json(User::findOrFail($id));
+        if ($userId) {
+            $user = User::query()
+                ->select('id', 'name', 'lastname', 'mobile')
+                ->when(request('accountable', 0), function ($q) {
+                    $q->where('is_accountable', 1);
+                })
+                ->where('id', $userId)
+                ->first();
+            if (!$user) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "کاربر یافت نشد"
+                ], 201);
+            }
+            return response()->json([
+                "status" => "success",
+                "data" => $user
+            ], 200);
+        }
     }
 
     public function store(Request $request)

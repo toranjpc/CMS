@@ -49,7 +49,8 @@ Route::prefix('users')
         });
 
         Route::get('/', [UserController::class, 'index'])->name('index');
-        Route::get('{id}', [UserController::class, 'show'])->name('show');
+        Route::post('/list', [UserController::class, 'index'])->name('indexSearch');
+        Route::post('{userId}', [UserController::class, 'show'])->name('show');
         Route::post('/', [UserController::class, 'store'])->name('store');
         Route::put('{user}', [UserController::class, 'update'])->name('update');
         Route::delete('{user}', [UserController::class, 'destroy'])->name('destroy');

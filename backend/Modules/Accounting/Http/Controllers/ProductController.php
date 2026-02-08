@@ -1,0 +1,1769 @@
+<?php
+
+namespace Modules\Accounting\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Modules\Accounting\Models\Product;
+use Modules\Accounting\Models\ProductItem;
+use Modules\Accounting\Models\ProductOption;
+use Modules\Accounting\Models\Invoice;
+use Modules\User\Models\ExtData;
+use PhpParser\Node\Stmt\TryCatch;
+
+class ProductController extends Controller
+{
+    /******* categories *******/
+    public function category_index()
+    {
+        try {
+            $Options = ProductOption::where("kind", "category");
+
+            $f_id = 0;
+            if (!empty(request('father'))) $f_id = request('father');
+            $Options = $Options->where('f_id', $f_id);
+
+            if (!empty(request('values'))) {
+                $values = request('values');
+                $Options = $Options->select('id', 'title')->where('title', 'LIKE', '%' . $values . '%');
+            } else {
+                $Options = $Options->select('id', 'f_id', 'title', 'option', 'created_at', 'updated_at', 'deleted_at');
+                if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
+                if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
+            }
+            $Options = $Options->orderBy('id', 'DESC')->paginate(request("limit", 10));
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "items" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    "status" => "error",
+                ],
+                500
+            );
+        }
+    }
+
+    public function category_show($id = 0)
+    {
+        if ($id) {
+            $f_id = 0;
+            if (!empty(request('father'))) $f_id = request('father');
+            $category = ProductOption::select("id", "title")->where('kind', 'category')->where('f_id', $f_id)->find($id);
+            if (!$category) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "دسته‌بندی یافت نشد"
+                ], 404);
+            }
+            return response()->json([
+                "status" => "success",
+                "data" => $category
+            ], 200);
+        }
+        return response()->json([
+            "status" => "unsuccess",
+            "message" => "دسته‌بندی یافت نشد"
+        ], 404);
+    }
+
+    public function category_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'category')
+                            ->whereNull('deleted_at'),
+                    ],
+                    'parent_id' => 'nullable|intiger',
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'category');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در دسته بندی‌ها موجود نیست',
+                    'title.required' => 'عنوان دسته بندی الزامی است',
+                    'title.string' => 'عنوان دسته بندی باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان دسته بندی نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $category = ProductOption::create([
+                "f_id" => $data['parent_id'] ?? 0,
+                "title" => $data['title'],
+                "kind" => "category",
+                "option" => [],
+            ]);
+
+
+            if ($request->hasFile('icon')) {
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $category->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/categories', $iconName);
+            }
+
+            return response()->json([
+                "status" => "success",
+                "data" => $category
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت دسته بندی رخ داد",
+            ], 500);
+        }
+    }
+
+    public function category_update(Request $request, ProductOption $category)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'category')
+                            ->whereNull('deleted_at')
+                            ->ignore($category->id),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'category');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در دسته بندی‌ها موجود نیست',
+                    'title.required' => 'عنوان دسته بندی الزامی است',
+                    'title.string' => 'عنوان دسته بندی باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان دسته بندی نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $category->f_id = $data['parent_id'] ?? 0;
+            $category->title = $data['title'];
+            $category->updated_at = now();
+            $category->update();
+
+            if ($request->hasFile('icon')) {
+                $oldIconPath = storage_path('app/public/products/categories/' . $category->id . '.*');
+                $oldFiles = glob($oldIconPath);
+                foreach ($oldFiles as $oldFile) {
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                    }
+                }
+
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+
+
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $category->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/categories', $iconName);
+            }
+
+
+            return response()->json([
+                "status" => "success",
+                "data" => $category
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش دسته بندی رخ داد",
+            ], 500);
+        }
+    }
+
+    public function category_destroy(ProductOption $category)
+    {
+        $category->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "دسته بندی با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function category_force_destroy($id)
+    {
+        $category = ProductOption::withTrashed()->findOrFail($id);
+
+        // پاک کردن فایل آیکون
+        $oldIconPath = storage_path('app/public/products/categories/' . $category->id . '.*');
+        $oldFiles = glob($oldIconPath);
+        foreach ($oldFiles as $oldFile) {
+            if (file_exists($oldFile)) {
+                unlink($oldFile);
+            }
+        }
+
+        $category->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "دسته بندی به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function category_restore($id)
+    {
+        $category = ProductOption::withTrashed()->findOrFail($id);
+        $category->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "دسته بندی بازیابی شد",
+            "data" => $category
+        ], 200);
+    }
+    /******* categories *******/
+
+
+    /******* features *******/
+    public function feature_index()
+    {
+        try {
+            $Options = ProductOption::select('id', 'f_id', 'title', 'option->values as values', 'created_at', 'updated_at', 'deleted_at')
+                ->where("kind", "option");
+
+            if (!empty(request('values'))) {
+                $values = request('values');
+                $Options = $Options->select('id', 'title')->where('title', 'LIKE', '%' . $values . '%');
+            } else {
+                if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
+                if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
+            }
+            $Options = $Options->orderBy('id', 'DESC')->paginate(request("limit", 10));
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "items" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    "status" => "error",
+                ],
+                500
+            );
+        }
+    }
+
+    public function feature_show($id = 0)
+    {
+        if ($id) {
+            $feature = ProductOption::select("id", "title")->where('kind', 'option')->find($id);
+            if (!$feature) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "ویژگی یافت نشد"
+                ], 404);
+            }
+            return response()->json([
+                "status" => "success",
+                "data" => $feature
+            ], 200);
+        }
+        return response()->json([
+            "status" => "unsuccess",
+            "message" => "ویژگی یافت نشد"
+        ], 404);
+    }
+
+    public function feature_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'option')
+                            ->whereNull('deleted_at'),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'option');
+                    })],
+                    'values' => 'nullable',
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در ویژگی‌ها موجود نیست',
+                    'title.required' => 'عنوان ویژگی الزامی است',
+                    'title.string' => 'عنوان ویژگی باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان ویژگی نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $option = ["values" => $data['values'] ?? []];
+            $feature = ProductOption::create([
+                "f_id" => $data['parent_id'] ?? 0,
+                "title" => $data['title'],
+                "kind" => "option",
+                "option" => $option,
+            ]);
+
+            $feature->values = $option["values"];
+
+            if ($request->hasFile('icon')) {
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $feature->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/features', $iconName);
+            }
+
+            return response()->json([
+                "status" => "success",
+                "data" => $feature
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت ویژگی رخ داد",
+            ], 500);
+        }
+    }
+
+    public function feature_update(ProductOption $feature, Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'option')
+                            ->whereNull('deleted_at')
+                            ->ignore($feature->id),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'option');
+                    })],
+                    'values' => 'nullable',
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در ویژگی‌ها موجود نیست',
+                    'title.required' => 'عنوان ویژگی الزامی است',
+                    'title.string' => 'عنوان ویژگی باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان ویژگی نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $feature->f_id = $data['parent_id'] ?? 0;
+            $feature->title = $data['title'];
+
+            $option = $feature->option;
+            $option["values"] = $data['values'] ?? [];
+            $feature->option = $option;
+
+            $feature->updated_at = now();
+            $feature->update();
+
+            $feature->values = $option["values"];
+
+            if ($request->hasFile('icon')) {
+                $oldIconPath = storage_path('app/public/products/features/' . $feature->id . '.*');
+                $oldFiles = glob($oldIconPath);
+                foreach ($oldFiles as $oldFile) {
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                    }
+                }
+
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+
+
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $feature->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/features', $iconName);
+            }
+
+
+            return response()->json([
+                "status" => "success",
+                "data" => $feature
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش ویژگی رخ داد",
+            ], 500);
+        }
+    }
+
+    public function feature_destroy(ProductOption $feature)
+    {
+        $feature->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "ویژگی با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function feature_force_destroy($id)
+    {
+        $feature = ProductOption::withTrashed()->findOrFail($id);
+
+        // پاک کردن فایل آیکون
+        $oldIconPath = storage_path('app/public/products/features/' . $feature->id . '.*');
+        $oldFiles = glob($oldIconPath);
+        foreach ($oldFiles as $oldFile) {
+            if (file_exists($oldFile)) {
+                unlink($oldFile);
+            }
+        }
+
+        $feature->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "ویژگی به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function feature_restore($id)
+    {
+        $feature = ProductOption::withTrashed()->findOrFail($id);
+        $feature->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "ویژگی بازیابی شد",
+            "data" => $feature
+        ], 200);
+    }
+    /******* features *******/
+
+
+    /******* brands *******/
+    public function brand_index()
+    {
+        try {
+            $Options = ProductOption::select('id', 'f_id', 'title', 'option', 'created_at', 'updated_at', 'deleted_at')
+                ->where("kind", "brand");
+
+            if (!empty(request('values'))) {
+                $values = request('values');
+                $Options = $Options->select('id', 'title')->where('title', 'LIKE', '%' . $values . '%');
+            } else {
+                if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
+                if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
+            }
+            $Options = $Options->orderBy('id', 'DESC')->paginate(request("limit", 10));
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "items" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    "status" => "error",
+                ],
+                500
+            );
+        }
+    }
+
+    public function brand_show($id = 0)
+    {
+        if ($id) {
+            $brand = ProductOption::select("id", "title")->where('kind', 'brand')->find($id);
+            if (!$brand) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "برند یافت نشد"
+                ], 404);
+            }
+            return response()->json([
+                "status" => "success",
+                "data" => $brand
+            ], 200);
+        }
+        return response()->json([
+            "status" => "unsuccess",
+            "message" => "برند یافت نشد"
+        ], 404);
+    }
+
+    public function brand_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'brand')
+                            ->whereNull('deleted_at'),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'brand');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در برندها موجود نیست',
+                    'title.required' => 'عنوان برند الزامی است',
+                    'title.string' => 'عنوان برند باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان برند نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $brand = ProductOption::create([
+                "f_id" => $data['parent_id'] ?? 0,
+                "title" => $data['title'],
+                "kind" => "brand",
+                "option" => [],
+            ]);
+
+
+            if ($request->hasFile('icon')) {
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $brand->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/brands', $iconName);
+            }
+
+            return response()->json([
+                "status" => "success",
+                "data" => $brand
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت برند رخ داد",
+            ], 500);
+        }
+    }
+
+    public function brand_update(Request $request, ProductOption $brand)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'brand')
+                            ->whereNull('deleted_at')
+                            ->ignore($brand->id),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'brand');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در برندها موجود نیست',
+                    'title.required' => 'عنوان برند الزامی است',
+                    'title.string' => 'عنوان برند باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان برند نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $brand->f_id = $data['parent_id'] ?? 0;
+            $brand->title = $data['title'];
+            $brand->updated_at = now();
+            $brand->update();
+
+            if ($request->hasFile('icon')) {
+                $oldIconPath = storage_path('app/public/products/brands/' . $brand->id . '.*');
+                $oldFiles = glob($oldIconPath);
+                foreach ($oldFiles as $oldFile) {
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                    }
+                }
+
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+
+
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $brand->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/brands', $iconName);
+            }
+
+
+            return response()->json([
+                "status" => "success",
+                "data" => $brand
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش برند رخ داد",
+            ], 500);
+        }
+    }
+
+
+    public function brand_destroy(ProductOption $brand)
+    {
+        $brand->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function brand_force_destroy($id)
+    {
+        $brand = ProductOption::withTrashed()->findOrFail($id);
+
+        // پاک کردن فایل آیکون
+        $oldIconPath = storage_path('app/public/products/brands/' . $brand->id . '.*');
+        $oldFiles = glob($oldIconPath);
+        foreach ($oldFiles as $oldFile) {
+            if (file_exists($oldFile)) {
+                unlink($oldFile);
+            }
+        }
+
+        $brand->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function brand_restore($id)
+    {
+        $brand = ProductOption::withTrashed()->findOrFail($id);
+        $brand->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند بازیابی شد",
+            "data" => $brand
+        ], 200);
+    }
+    /******* brands *******/
+
+    /******* units *******/
+    public function unit_index()
+    {
+        try {
+            $Options = ProductOption::select('id', 'f_id', 'title', 'option', 'created_at', 'updated_at', 'deleted_at')
+                ->where("kind", "unit");
+
+            if (!empty(request('values'))) {
+                $values = request('values');
+                $Options = $Options->select('id', 'title')->where('title', 'LIKE', '%' . $values . '%');
+            } else {
+                if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
+                if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
+            }
+            $Options = $Options->orderBy('id', 'DESC')->paginate(request("limit", 10));
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "items" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    "status" => "error",
+                ],
+                500
+            );
+        }
+    }
+
+    public function unit_show($id = 0)
+    {
+        if ($id) {
+            $unit = ProductOption::select("id", "title")->where('kind', 'unit')->find($id);
+            if (!$unit) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "واحد یافت نشد"
+                ], 404);
+            }
+            return response()->json([
+                "status" => "success",
+                "data" => $unit
+            ], 200);
+        }
+        return response()->json([
+            "status" => "unsuccess",
+            "message" => "واحد یافت نشد"
+        ], 404);
+    }
+
+    public function unit_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'unit')
+                            ->whereNull('deleted_at'),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'unit');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در برندها موجود نیست',
+                    'title.required' => 'عنوان برند الزامی است',
+                    'title.string' => 'عنوان برند باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان برند نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $unit = ProductOption::create([
+                "f_id" => $data['parent_id'] ?? 0,
+                "title" => $data['title'],
+                "kind" => "unit",
+                "option" => [],
+            ]);
+
+
+            if ($request->hasFile('icon')) {
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $unit->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/units', $iconName);
+            }
+
+            return response()->json([
+                "status" => "success",
+                "data" => $unit
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت برند رخ داد",
+            ], 500);
+        }
+    }
+
+    public function unit_update(Request $request, ProductOption $unit)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'unit')
+                            ->whereNull('deleted_at')
+                            ->ignore($unit->id),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'unit');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در برندها موجود نیست',
+                    'title.required' => 'عنوان برند الزامی است',
+                    'title.string' => 'عنوان برند باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان برند نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $unit->f_id = $data['parent_id'] ?? 0;
+            $unit->title = $data['title'];
+            $unit->updated_at = now();
+            $unit->update();
+
+            if ($request->hasFile('icon')) {
+                $oldIconPath = storage_path('app/public/products/units/' . $unit->id . '.*');
+                $oldFiles = glob($oldIconPath);
+                foreach ($oldFiles as $oldFile) {
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                    }
+                }
+
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+
+
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $unit->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/units', $iconName);
+            }
+
+
+            return response()->json([
+                "status" => "success",
+                "data" => $unit
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش برند رخ داد",
+            ], 500);
+        }
+    }
+
+    public function unit_destroy(ProductOption $unit)
+    {
+        $unit->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function unit_force_destroy($id)
+    {
+        $unit = ProductOption::withTrashed()->findOrFail($id);
+
+        // پاک کردن فایل آیکون
+        $oldIconPath = storage_path('app/public/products/units/' . $unit->id . '.*');
+        $oldFiles = glob($oldIconPath);
+        foreach ($oldFiles as $oldFile) {
+            if (file_exists($oldFile)) {
+                unlink($oldFile);
+            }
+        }
+
+        $unit->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function unit_restore($id)
+    {
+        $unit = ProductOption::withTrashed()->findOrFail($id);
+        $unit->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند بازیابی شد",
+            "data" => $unit
+        ], 200);
+    }
+    /******* units *******/
+
+    /******* warehouses *******/
+    public function warehouse_index()
+    {
+        try {
+            $Options = ProductOption::select('id', 'f_id', 'title', 'option', 'created_at', 'updated_at', 'deleted_at')
+                ->where("kind", "warehouse");
+
+            if (!empty(request('values'))) {
+                $values = request('values');
+                $Options = $Options->select('id', 'title')->where('title', 'LIKE', '%' . $values . '%');
+            } else {
+                if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
+                if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
+            }
+            $Options = $Options->orderBy('id', 'DESC')->paginate(request("limit", 10));
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "items" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            // throw $th;
+            return response()->json(
+                [
+                    "status" => "error",
+                ]
+            );
+        }
+    }
+
+    public function warehouse_show($id = 0)
+    {
+        if ($id) {
+            $warehouse = ProductOption::select("id", "title")->where('kind', 'warehouse')->find($id);
+            if (!$warehouse) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "انبار یافت نشد"
+                ], 201);
+            }
+            return response()->json([
+                "status" => "success",
+                "data" => $warehouse
+            ], 200);
+        }
+        return response()->json([
+            "status" => "unsuccess",
+            "message" => "انبار یافت نشد"
+        ], 201);
+    }
+
+
+    public function warehouse_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'warehouse')
+                            ->whereNull('deleted_at'),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'warehouse');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در برندها موجود نیست',
+                    'title.required' => 'عنوان برند الزامی است',
+                    'title.string' => 'عنوان برند باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان برند نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $warehouse = ProductOption::create([
+                "f_id" => $data['parent_id'] ?? 0,
+                "title" => $data['title'],
+                "kind" => "warehouse",
+                "option" => [],
+            ]);
+
+
+            if ($request->hasFile('icon')) {
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $warehouse->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/warehouses', $iconName);
+            }
+
+            return response()->json([
+                "status" => "success",
+                "data" => $warehouse
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت برند رخ داد",
+            ], 500);
+        }
+    }
+
+    public function warehouse_update(Request $request, ProductOption $warehouse)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where('f_id', 0)
+                            ->where('kind', 'warehouse')
+                            ->whereNull('deleted_at')
+                            ->ignore($warehouse->id),
+                    ],
+                    'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
+                        $query->where('kind', 'warehouse');
+                    })],
+                    'icon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                ],
+                [
+                    'parent_id.integer' => 'شناسه والد باید عددی باشد',
+                    'parent_id.exists' => 'شناسه والد در برندها موجود نیست',
+                    'title.required' => 'عنوان برند الزامی است',
+                    'title.string' => 'عنوان برند باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان برند نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'icon.file' => 'فایل باید معتبر باشد',
+                    'icon.mimes' => 'فرمت فایل باید jpeg، png، jpg، gif یا svg باشد',
+                    'icon.max' => 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            $warehouse->f_id = $data['parent_id'] ?? 0;
+            $warehouse->title = $data['title'];
+            $warehouse->updated_at = now();
+            $warehouse->update();
+
+            if ($request->hasFile('icon')) {
+                $oldIconPath = storage_path('app/public/products/warehouses/' . $warehouse->id . '.*');
+                $oldFiles = glob($oldIconPath);
+                foreach ($oldFiles as $oldFile) {
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                    }
+                }
+
+                $iconFile = $request->file('icon');
+                $extension = strtolower($iconFile->getClientOriginalExtension());
+
+
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('فرمت فایل مجاز نیست');
+                }
+                $iconName = $warehouse->id; //. '.' . $extension;
+                $stored = $iconFile->storeAs('products/warehouses', $iconName);
+            }
+
+
+            return response()->json([
+                "status" => "success",
+                "data" => $warehouse
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش برند رخ داد",
+            ], 500);
+        }
+    }
+
+
+    public function warehouse_destroy(ProductOption $warehouse)
+    {
+        $warehouse->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function warehouse_force_destroy($id)
+    {
+        $warehouse = ProductOption::withTrashed()->findOrFail($id);
+
+        // پاک کردن فایل آیکون
+        $oldIconPath = storage_path('app/public/products/warehouses/' . $warehouse->id . '.*');
+        $oldFiles = glob($oldIconPath);
+        foreach ($oldFiles as $oldFile) {
+            if (file_exists($oldFile)) {
+                unlink($oldFile);
+            }
+        }
+
+        $warehouse->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function warehouse_restore($id)
+    {
+        $warehouse = ProductOption::withTrashed()->findOrFail($id);
+        $warehouse->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "برند بازیابی شد",
+            "data" => $warehouse
+        ], 200);
+    }
+    /******* warehouses *******/
+
+
+
+    public function lastid()
+    {
+        return Invoice::max("id") + 1;
+    }
+    public function index()
+    {
+        $products = Product::with([
+            'variants',
+            // 'brand:id,title',
+            // 'unit:id,title',
+            // 'warehouse:id,title'
+        ]); // Only main products, not variants
+
+        if (!empty(request('values'))) {
+            $values = request('values');
+            $products = $products->select('id', 'title', 'barcode', 'status');
+            $products = $products->where(function ($q) use ($values) {
+                $q->where('title', 'LIKE', '%' . $values . '%')
+                    ->orWhere('barcode', 'LIKE', '%' . $values . '%');
+            });
+        } else {
+            if (!empty(request('trashed')) && request('trashed') == "true") $products = $products->onlyTrashed();
+            if (!empty(request('title'))) $products = $products->where('title', 'LIKE', '%' . request('title') . '%');
+            if (!empty(request('barcode'))) $products = $products->where('barcode', 'LIKE', '%' . request('barcode') . '%');
+            if (!empty(request('status'))) $products = $products->where('status', request('status'));
+
+            // if (!empty(request('brand_id'))) $products = $products->where('brand_id', request('brand_id'));
+            // if (!empty(request('category_id'))) $products = $products->where('category_id', request('category_id'));
+            // if (!empty(request('feature_id'))) $products = $products->where('feature_id', request('feature_id'));
+            // if (!empty(request('unit_id'))) $products = $products->where('unit_id', request('unit_id'));
+            // if (!empty(request('price'))) $products = $products->where('price', request('price'));
+            // if (!empty(request('price_from'))) $products = $products->where('price', '>=', request('price_from'));
+            // if (!empty(request('price_to'))) $products = $products->where('price', '<=', request('price_to'));
+
+            $products = $products->select("*");
+        }
+
+        $products = $products->orderByDesc('id')->paginate(request("limit", 10));
+
+        return response()->json([
+            "status" => "success",
+            "items" => $products
+        ], 200);
+    }
+
+    public function show($id)
+    {
+        $Product = Product::with(['variants', 'categores', 'option', 'brand', 'unit', 'warehouse'])
+            ->where('id', $id)
+            ->withTrashed()
+            ->first();
+
+
+        return response()->json([
+            "status" => "success",
+            "data" => $Product
+        ], 200);
+    }
+
+    public function store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    // Main product fields
+                    'status' => 'nullable|integer',
+                    'title' => 'required|string|max:255',
+                    'barcode' => 'required|string|max:255|unique:products,barcode',
+                    'tax_rate' => 'nullable|integer',
+                    'min_buy' => 'nullable|integer',
+                    'max_buy' => 'nullable|integer',
+                    'alert' => 'nullable|integer',
+                    'des' => 'nullable|string',
+                    'selectedUnit' => 'nullable|integer|exists:product_options,id',
+                    'selectedBrand' => 'nullable|integer|exists:product_options,id',
+                    'selectedWarehouse' => 'nullable|integer|exists:product_options,id',
+
+                    // Categories
+                    'Categores' => 'nullable|array',
+                    'Categores.*' => 'integer|exists:product_options,id',
+
+                    // Variants
+                    'variants' => 'required|array|min:1',
+                    'variants.*.title' => 'required|string|max:255',
+                    'variants.*.firstWarehouse' => 'nullable|integer',
+                    'variants.*.firstPrice' => 'nullable|decimal:0,2',
+                    'variants.*.current_stock' => 'nullable|integer',
+                    'variants.*.sell_price' => 'nullable|decimal:0,2',
+                    'variants.*.status' => 'nullable|integer',
+
+                    // Form data
+                    'form' => 'nullable|string',
+
+                    // Images
+                    'album' => 'nullable|string',
+                    'images' => 'nullable|array',
+                    'images.*' => 'file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                ],
+                [
+                    'title.required' => 'عنوان محصول الزامی است',
+                    'title.string' => 'عنوان محصول باید متن باشد',
+                    'title.max' => 'عنوان محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
+
+                    'barcode.required' => 'بارکد محصول الزامی است',
+                    'barcode.string' => 'بارکد محصول باید متن باشد',
+                    'barcode.max' => 'بارکد محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'barcode.unique' => 'این بارکد قبلاً ثبت شده است',
+
+                    'status.integer' => 'وضعیت محصول معتبر نیست',
+                    'tax_rate.integer' => 'نرخ مالیات معتبر نیست',
+                    'min_buy.integer' => 'حداقل خرید معتبر نیست',
+                    'max_buy.integer' => 'حداکثر خرید معتبر نیست',
+                    'alert.integer' => 'موجودی هشدار معتبر نیست',
+                    'des.string' => 'توضیحات باید متن باشد',
+
+                    'selectedUnit.integer' => 'واحد انتخاب شده معتبر نیست',
+                    'selectedUnit.exists' => 'واحد انتخاب شده یافت نشد',
+                    'selectedBrand.integer' => 'برند انتخاب شده معتبر نیست',
+                    'selectedBrand.exists' => 'برند انتخاب شده یافت نشد',
+                    'selectedWarehouse.integer' => 'انبار انتخاب شده معتبر نیست',
+                    'selectedWarehouse.exists' => 'انبار انتخاب شده یافت نشد',
+
+                    'Categores.array' => 'دسته‌بندی‌ها باید به صورت آرایه ارسال شوند',
+                    'Categores.*.integer' => 'شناسه دسته‌بندی معتبر نیست',
+                    'Categores.*.exists' => 'دسته‌بندی انتخاب شده یافت نشد',
+
+                    'variants.required' => 'حداقل یک تنوع محصول الزامی است',
+                    'variants.array' => 'تنوع‌ها باید به صورت آرایه ارسال شوند',
+                    'variants.min' => 'حداقل یک تنوع باید تعریف شود',
+                    'variants.*.title.required' => 'عنوان تنوع الزامی است',
+                    'variants.*.title.string' => 'عنوان تنوع باید متن باشد',
+                    'variants.*.title.max' => 'عنوان تنوع نباید بیشتر از ۲۵۵ کاراکتر باشد',
+
+                    'variants.*.firstWarehouse.integer' => 'انبار اولیه باید عدد صحیح باشد',
+                    'variants.*.firstPrice.decimal' => 'قیمت اولیه باید عدد باشد',
+                    'variants.*.current_stock.integer' => 'موجودی فعلی باید عدد صحیح باشد',
+                    'variants.*.sell_price.decimal' => 'قیمت فروش باید عدد باشد',
+                    'variants.*.status.integer' => 'وضعیت تنوع معتبر نیست',
+
+                    'form.string' => 'فرم باید به صورت متن JSON ارسال شود',
+
+                    'album.string' => 'آلبوم باید به صورت متن JSON ارسال شود',
+                    'images.array' => 'تصاویر باید به صورت آرایه ارسال شوند',
+                    'images.*.file' => 'هر تصویر باید فایل معتبر باشد',
+                    'images.*.mimes' => 'فرمت تصویر باید jpeg، png، jpg، gif یا svg باشد',
+                    'images.*.max' => 'حجم هر تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            // Handle images if uploaded
+            $albumData = null;
+            if ($request->hasFile('images')) {
+                $albumData = $this->handleImageUploads($request->file('images'));
+            } elseif ($request->has('album')) {
+                $albumData = json_decode($request->input('album'), true);
+            }
+
+            // Create main product
+            $mainProduct = Product::create([
+                'user_id' => Auth::id() ?? 1,
+                'title' => $data['title'],
+                'barcode' => $data['barcode'],
+                'album' => $albumData,
+                'tags' => null,
+                'des' => $data['des'] ?? null,
+                'form' => isset($data['form']) ? json_decode($data['form'], true) : null,
+                'tax_rate' => $data['tax_rate'] ?? 10,
+                'min_buy' => $data['min_buy'] ?? 0,
+                'max_buy' => $data['max_buy'] ?? 0,
+                'alert' => $data['alert'] ?? 0,
+                'status' => $data['status'] ?? 1,
+            ]);
+
+            // Create product variants
+            foreach ($data['variants'] as $variant) {
+                ProductItem::create([
+                    'user_id' => Auth::id() ?? 1,
+                    'f_id' => $mainProduct->id,
+                    'title' => $variant['title'] ?: $data['title'],
+                    'firstWarehouse' => $variant['firstWarehouse'] ?? 0,
+                    'current_stock' => $variant['current_stock'] ?? 0,
+                    'firstPrice' => $variant['firstPrice'] ?? 0,
+                    'sell_price' => $variant['sell_price'] ?? 0,
+                    'status' => $variant['status'] ?? 1,
+                ]);
+            }
+
+            // Create relationships using ExtData
+            if (!empty($data['Categores'])) {
+                foreach ($data['Categores'] as $categoryId) {
+                    if ($categoryId > 0) {
+                        ExtData::create([
+                            'f_id' => $mainProduct->id,
+                            'm_id' => $categoryId,
+                            'kind' => 'ProductCategory',
+                            'status' => 1,
+                        ]);
+                    }
+                }
+            }
+
+            if (!empty($data['selectedUnit'])) {
+                ExtData::create([
+                    'f_id' => $mainProduct->id,
+                    'm_id' => $data['selectedUnit'],
+                    'kind' => 'ProductUnit',
+                    'status' => 1,
+                ]);
+            }
+
+            if (!empty($data['selectedBrand'])) {
+                ExtData::create([
+                    'f_id' => $mainProduct->id,
+                    'm_id' => $data['selectedBrand'],
+                    'kind' => 'ProductBrand',
+                    'status' => 1,
+                ]);
+            }
+
+            if (!empty($data['selectedWarehouse'])) {
+                ExtData::create([
+                    'f_id' => $mainProduct->id,
+                    'm_id' => $data['selectedWarehouse'],
+                    'kind' => 'ProductWarehouse',
+                    'status' => 1,
+                ]);
+            }
+
+            return response()->json([
+                "status" => "success",
+                "data" => $mainProduct->load(['variants', 'categores', 'option', 'brand', 'unit', 'warehouse']),
+                "message" => "محصول با موفقیت ایجاد شد"
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت محصول رخ داد: " . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        // return $request;
+        try {
+            $data = $request->validate(
+                [
+                    // Main product fields
+                    'status' => 'nullable|integer',
+                    'title' => 'required|string|max:255',
+                    'barcode' => ['required', 'string', 'max:255', Rule::unique('products', 'barcode')->ignore($id ?? null)],
+                    'tax_rate' => 'nullable|integer',
+                    'min_buy' => 'nullable|integer',
+                    'max_buy' => 'nullable|integer',
+                    'alert' => 'nullable|integer',
+                    'des' => 'nullable|string',
+                    'selectedUnit' => 'nullable|integer|exists:product_options,id',
+                    'selectedBrand' => 'nullable|integer|exists:product_options,id',
+                    'selectedWarehouse' => 'nullable|integer|exists:product_options,id',
+
+                    // Categories
+                    'Categores' => 'nullable|array',
+                    'Categores.*' => 'integer|exists:product_options,id',
+
+                    // Variants
+                    'variants' => 'required|array|min:1',
+                    'variants.*.title' => 'required|string|max:255',
+                    'variants.*.firstWarehouse' => 'nullable|integer',
+                    'variants.*.firstPrice' => 'nullable|decimal:0,2',
+                    'variants.*.current_stock' => 'nullable|integer',
+                    'variants.*.sell_price' => 'nullable|decimal:0,2',
+                    'variants.*.status' => 'nullable|integer',
+
+                    // Form data
+                    'form' => 'nullable|string',
+
+                    // Images
+                    'album' => 'nullable|string',
+                    'images' => 'nullable|array',
+                    'images.*' => 'file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                ],
+                [
+                    'title.required' => 'عنوان محصول الزامی است',
+                    'title.string' => 'عنوان محصول باید متن باشد',
+                    'title.max' => 'عنوان محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
+
+                    'barcode.required' => 'بارکد محصول الزامی است',
+                    'barcode.string' => 'بارکد محصول باید متن باشد',
+                    'barcode.max' => 'بارکد محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'barcode.unique' => 'این بارکد قبلاً ثبت شده است',
+
+                    'status.integer' => 'وضعیت محصول معتبر نیست',
+                    'tax_rate.integer' => 'نرخ مالیات معتبر نیست',
+                    'min_buy.integer' => 'حداقل خرید معتبر نیست',
+                    'max_buy.integer' => 'حداکثر خرید معتبر نیست',
+                    'alert.integer' => 'موجودی هشدار معتبر نیست',
+                    'des.string' => 'توضیحات باید متن باشد',
+
+                    'selectedUnit.integer' => 'واحد انتخاب شده معتبر نیست',
+                    'selectedUnit.exists' => 'واحد انتخاب شده یافت نشد',
+                    'selectedBrand.integer' => 'برند انتخاب شده معتبر نیست',
+                    'selectedBrand.exists' => 'برند انتخاب شده یافت نشد',
+                    'selectedWarehouse.integer' => 'انبار انتخاب شده معتبر نیست',
+                    'selectedWarehouse.exists' => 'انبار انتخاب شده یافت نشد',
+
+                    'Categores.array' => 'دسته‌بندی‌ها باید به صورت آرایه ارسال شوند',
+                    'Categores.*.integer' => 'شناسه دسته‌بندی معتبر نیست',
+                    'Categores.*.exists' => 'دسته‌بندی انتخاب شده یافت نشد',
+
+                    'variants.required' => 'حداقل یک تنوع محصول الزامی است',
+                    'variants.array' => 'تنوع‌ها باید به صورت آرایه ارسال شوند',
+                    'variants.min' => 'حداقل یک تنوع باید تعریف شود',
+                    'variants.*.title.required' => 'عنوان تنوع الزامی است',
+                    'variants.*.title.string' => 'عنوان تنوع باید متن باشد',
+                    'variants.*.title.max' => 'عنوان تنوع نباید بیشتر از ۲۵۵ کاراکتر باشد',
+
+                    'variants.*.firstWarehouse.integer' => 'انبار اولیه باید عدد صحیح باشد',
+                    'variants.*.firstPrice.decimal' => 'قیمت اولیه باید عدد باشد',
+                    'variants.*.current_stock.integer' => 'موجودی فعلی باید عدد صحیح باشد',
+                    'variants.*.sell_price.decimal' => 'قیمت فروش باید عدد باشد',
+                    'variants.*.status.integer' => 'وضعیت تنوع معتبر نیست',
+
+                    'form.string' => 'فرم باید به صورت متن JSON ارسال شود',
+
+                    'album.string' => 'آلبوم باید به صورت متن JSON ارسال شود',
+                    'images.array' => 'تصاویر باید به صورت آرایه ارسال شوند',
+                    'images.*.file' => 'هر تصویر باید فایل معتبر باشد',
+                    'images.*.mimes' => 'فرمت تصویر باید jpeg، png، jpg، gif یا svg باشد',
+                    'images.*.max' => 'حجم هر تصویر نباید بیشتر از ۲ مگابایت باشد',
+                ]
+            );
+
+            // Find the product
+            $mainProduct = Product::findOrFail($id);
+
+            // Handle images
+            $albumData = $mainProduct->album; // Keep existing album
+            if ($request->hasFile('images')) {
+                $albumData = $this->handleImageUploads($request->file('images'), $albumData);
+            } elseif ($request->has('album')) {
+                $albumPayload = json_decode($request->input('album'), true);
+                $albumData = $this->processAlbumPayload($albumPayload, $albumData);
+            }
+
+            // Update main product
+            $mainProduct->update([
+                'title' => $data['title'],
+                'barcode' => $data['barcode'],
+                'album' => $albumData,
+                'des' => $data['des'] ?? null,
+                'form' => isset($data['form']) ? json_decode($data['form'], true) : $mainProduct->form,
+                'tax_rate' => $data['tax_rate'] ?? 10,
+                'min_buy' => $data['min_buy'] ?? 0,
+                'max_buy' => $data['max_buy'] ?? 0,
+                'alert' => $data['alert'] ?? 0,
+                'status' => $data['status'] ?? 1,
+            ]);
+
+            // Delete existing variants and recreate them
+            ProductItem::where('f_id', $mainProduct->id)->delete();
+
+            foreach ($data['variants'] as $variant) {
+                ProductItem::create([
+                    'user_id' => Auth::id() ?? 1,
+                    'f_id' => $mainProduct->id,
+                    'title' => $variant['title'] ?: $data['title'],
+                    'firstWarehouse' => $variant['firstWarehouse'] ?? 0,
+                    'current_stock' => $variant['current_stock'] ?? 0,
+                    'firstPrice' => $variant['firstPrice'] ?? 0,
+                    'sell_price' => $variant['sell_price'] ?? 0,
+                    'status' => $variant['status'] ?? 1,
+                ]);
+            }
+
+            // Update relationships
+            // Delete existing relationships
+            ExtData::where('f_id', $mainProduct->id)
+                ->whereIn('kind', ['ProductCategory', 'ProductUnit', 'ProductBrand', 'ProductWarehouse'])
+                ->delete();
+
+            // Create new category relationships
+            if (!empty($data['Categores'])) {
+                foreach ($data['Categores'] as $categoryId) {
+                    if ($categoryId > 0) {
+                        ExtData::create([
+                            'f_id' => $mainProduct->id,
+                            'm_id' => $categoryId,
+                            'kind' => 'ProductCategory',
+                            'status' => 1,
+                        ]);
+                    }
+                }
+            }
+
+            // Create unit relationship
+            if (!empty($data['selectedUnit'])) {
+                ExtData::create([
+                    'f_id' => $mainProduct->id,
+                    'm_id' => $data['selectedUnit'],
+                    'kind' => 'ProductUnit',
+                    'status' => 1,
+                ]);
+            }
+
+            // Create brand relationship
+            if (!empty($data['selectedBrand'])) {
+                ExtData::create([
+                    'f_id' => $mainProduct->id,
+                    'm_id' => $data['selectedBrand'],
+                    'kind' => 'ProductBrand',
+                    'status' => 1,
+                ]);
+            }
+
+            // Create warehouse relationship
+            if (!empty($data['selectedWarehouse'])) {
+                ExtData::create([
+                    'f_id' => $mainProduct->id,
+                    'm_id' => $data['selectedWarehouse'],
+                    'kind' => 'ProductWarehouse',
+                    'status' => 1,
+                ]);
+            }
+
+            return response()->json([
+                "status" => "success",
+                "data" => $mainProduct->load(['variants', 'categores', 'option', 'brand', 'unit', 'warehouse']),
+                "message" => "محصول با موفقیت ویرایش شد"
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش محصول رخ داد: " . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function handleImageUploads(array $images, array $existingAlbum = null)
+    {
+        $album = $existingAlbum ?: ['existing' => [], 'new' => [], 'removed' => []];
+        $index = count($album['existing']) + count($album['new']);
+
+        foreach ($images as $image) {
+            $extension = strtolower($image->getClientOriginalExtension());
+            $filename = uniqid() . '.' . $extension;
+            $path = $image->storeAs('products', $filename, 'public');
+
+            $album['new'][] = [
+                'index' => $index++,
+                'filename' => $filename,
+                'url' => asset('storage/products/' . $filename),
+                'thumb' => asset('storage/products/' . $filename), // You can generate thumbnail here
+            ];
+        }
+
+        return $album;
+    }
+
+    private function processAlbumPayload(array $albumPayload, array $existingAlbum = null)
+    {
+        $album = ['existing' => [], 'new' => [], 'removed' => []];
+
+        // Process existing images
+        if (isset($albumPayload['existing'])) {
+            $album['existing'] = $albumPayload['existing'];
+        }
+
+        // Process new images
+        if (isset($albumPayload['new'])) {
+            $album['new'] = $albumPayload['new'];
+        }
+
+        // Process removed images
+        if (isset($albumPayload['removed'])) {
+            $album['removed'] = $albumPayload['removed'];
+            // Here you can delete actual files from storage if needed
+        }
+
+        return $album;
+    }
+
+    public function destroy(Product $product)
+    {
+        $product->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "محصول با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function force_destroy($id)
+    {
+        $product = Product::withTrashed()->findOrFail($id);
+        $product->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "نقش به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function restore($id)
+    {
+        $product = Product::withTrashed()->findOrFail($id);
+        $product->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "نقش بازیابی شد",
+            "data" => $product
+        ], 200);
+    }
+}

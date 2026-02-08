@@ -11,7 +11,7 @@ class ModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $modulesPath = ["User", "Sse", "Product"];
+        $modulesPath = ["User", "Accounting", "Sse"];
 
         foreach ($modulesPath as $moduleName) {
             $providerClass = "Modules\\{$moduleName}\\{$moduleName}ServiceProvider";

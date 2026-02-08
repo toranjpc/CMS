@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Product\Http\Controllers\ProductController;
+use Modules\Accounting\Http\Controllers\ProductController;
 
 
 Route::prefix('apps')->middleware('auth:sanctum')->name('apps.')->group(function () {
