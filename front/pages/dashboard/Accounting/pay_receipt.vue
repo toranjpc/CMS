@@ -73,7 +73,7 @@
 
           <div class="col-md-2">
             <label class="form-label">مبلغ</label>
-            <input type="number" min="0" class="form-control" v-model.number="amount" :readonly="isViewingFromList" />
+            <widgets.CurrencyInput v-model="amount" :readonly="isViewingFromList" inputClass="form-control" />
           </div>
 
           <div class="col-md-4">
@@ -122,6 +122,7 @@
 <script setup>
 import Loading from '@/components/Loading.vue'
 import dateFild from '@/components/widgets/dateFild'
+import CurrencyInput from '@/components/widgets/CurrencyInput.vue'
 import Swal from 'sweetalert2'
 
 definePageMeta({
@@ -350,18 +351,26 @@ const submit = async () => {
     }
 
     const isEditing = Boolean(loadedTransaction.value?.id)
+    let response
+
     if (isEditing) {
-      await $api(`/transactions/${loadedTransaction.value.id}`, { method: 'PUT', body: payload })
+      response = await $api(`/transactions/${loadedTransaction.value.id}`, { method: 'PUT', body: payload })
       await loadExistingTransaction()
     } else {
-      await $api('/transactions', { method: 'POST', body: payload })
+      response = await $api('/transactions', { method: 'POST', body: payload })
       await resetForm()
+    }
+
+    // برای account_to_account، پیام خاص نمایش می‌دهیم
+    let successMessage = isEditing ? 'سند با موفقيت ويرايش شد' : 'سند با موفقيت ثبت شد'
+    if (paymentMethod.value === 'account_to_account') {
+      successMessage = isEditing ? 'دو سند حساب به حساب با موفقيت ويرايش شدند' : 'دو سند حساب به حساب با موفقيت ثبت شدند'
     }
 
     Swal.fire({
       icon: 'success',
       title: 'موفق',
-      text: isEditing ? 'سند با موفقيت ويرايش شد' : 'سند با موفقيت ثبت شد'
+      text: successMessage
     })
   } catch (error) {
     let errorMessage = 'مشکلي در ثبت سند رخ داده است.'

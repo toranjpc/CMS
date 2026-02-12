@@ -43,7 +43,7 @@ class ProductSeeder extends Seeder
         // ایجاد سطح اول: نوع حیوان
         $dogCategory = ProductOption::create([
             'title' => 'سگ',
-            'f_id' => 0,
+            'f_id' => null, // ریشه
             'kind' => 'category',
             'status' => 1,
         ]);
@@ -51,7 +51,7 @@ class ProductSeeder extends Seeder
 
         $catCategory = ProductOption::create([
             'title' => 'گربه',
-            'f_id' => 0,
+            'f_id' => null, // ریشه
             'kind' => 'category',
             'status' => 1,
         ]);
@@ -59,7 +59,7 @@ class ProductSeeder extends Seeder
 
         $birdCategory = ProductOption::create([
             'title' => 'پرنده',
-            'f_id' => 0,
+            'f_id' => null, // ریشه
             'kind' => 'category',
             'status' => 1,
         ]);

@@ -70,7 +70,7 @@
 
           <div class="col-md-3">
             <label class="form-label">قیمت واحد</label>
-            <input type="number" class="form-control" v-model.number="newItem.unitPrice" :readonly="isViewingFromList" />
+            <widgets.CurrencyInput v-model="newItem.unitPrice" :readonly="isViewingFromList" inputClass="form-control" />
           </div>
 
           <div class="col-md-1">
@@ -101,17 +101,17 @@
 
             <template v-for="(item, i) in items" :key="i">
               <tr>
-                <td>{{ i + 1 }}</td>
-                <td>{{ item.title }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>{{ format(item.unit_price) }}</td>
-                <td>{{ format(item.subtotal) }}</td>
-                <td>
-                  <button class="btn btn-sm btn-danger" @click="removeItem(i)" :disabled="isViewingFromList">
-                    حذف
-                  </button>
-                </td>
-              </tr>
+              <td>{{ i + 1 }}</td>
+              <td>{{ item.title }}</td>
+              <td>{{ item.quantity }}</td>
+              <td>{{ format(item.unit_price) }}</td>
+              <td>{{ format(item.subtotal) }}</td>
+              <td>
+                <button class="btn btn-sm btn-danger" @click="removeItem(i)" :disabled="isViewingFromList">
+                  حذف
+                </button>
+              </td>
+            </tr>
               <tr v-if="itemValidationErrors[i]">
                 <td colspan="6" class="text-danger small py-1">
                   {{ itemValidationErrors[i] }}
@@ -154,9 +154,14 @@
               <strong>{{ format(totals.final) }}</strong>
             </div>
 
-            <button v-if="!isViewingFromList" class="btn btn-success w-100 mt-3" :disabled="loading" @click="submit">
-              {{ loading ? 'در حال پردازش...' : submitButtonText }}
-            </button>
+            <div class="d-flex gap-2 mt-3">
+              <button v-if="!isViewingFromList" class="btn btn-success w-100" :disabled="loading" @click="submit">
+                {{ loading ? 'در حال پردازش...' : submitButtonText }}
+              </button>
+              <button v-if="!isViewingFromList" class="btn btn-outline-secondary" :disabled="loading" @click="startNewInvoice">
+                فاکتور جدید
+              </button>
+            </div>
             <button
               v-if="loadedInvoice?.id && !isViewingFromList"
               class="btn btn-outline-primary w-100 mt-2"
@@ -208,7 +213,7 @@
         <div v-if="showTransactionForm">
           <div class="mb-2">
             <label class="form-label">مبلغ سند</label>
-            <input type="number" min="0" class="form-control" v-model.number="transactionForm.amount" />
+            <widgets.CurrencyInput v-model="transactionForm.amount" inputClass="form-control" />
           </div>
 
           <div class="mb-2">
@@ -264,6 +269,7 @@
 <script setup>
 import Loading from '@/components/Loading.vue'
 import dateFild from '@/components/widgets/dateFild'
+import CurrencyInput from '@/components/widgets/CurrencyInput.vue'
 import Swal from 'sweetalert2'
 
 definePageMeta({
@@ -437,15 +443,15 @@ const addItem = () => {
       subtotal: mergedSubtotal
     }
   } else {
-    items.value.push({
-      product_item_id: product.value.id, // استفاده از product_item_id
-      warehouse_id: warehouse.value.id,
-      product_id: productId, // استفاده از product_id والد
-      title: product.value.display_name,
-      quantity: newItem.value.quantity,
-      unit_price: newItem.value.unitPrice,
-      subtotal: newItem.value.subtotal
-    })
+  items.value.push({
+    product_item_id: product.value.id, // استفاده از product_item_id
+    warehouse_id: warehouse.value.id,
+    product_id: productId, // استفاده از product_id والد
+    title: product.value.display_name,
+    quantity: newItem.value.quantity,
+    unit_price: newItem.value.unitPrice,
+    subtotal: newItem.value.subtotal
+  })
   }
 
   product.value = null
@@ -528,6 +534,8 @@ const closeTransactionWidget = () => {
   transactionList.value = []
 }
 
+const normalizeBeneficiary = (tr) => tr?.beneficiaryParty || tr?.beneficiary_party || null
+
 const applyTransactionToForm = (invoiceData, transactionData = null) => {
   if (!invoiceData?.id) return
 
@@ -536,7 +544,7 @@ const applyTransactionToForm = (invoiceData, transactionData = null) => {
   transactionForm.value = {
     amount: toNumber(transactionData?.amount ?? invoiceData.total),
     payment_method: transactionData?.payment_method || 'cash',
-    beneficiary_party: transactionData?.beneficiaryParty || null,
+    beneficiary_party: normalizeBeneficiary(transactionData),
     transaction_date: transactionData?.transaction_date || new Date().toISOString().split('T')[0],
     description: transactionData?.description || `ثبت خودکار ${invoiceData.type === 'buy' ? 'سند پرداخت' : 'سند دریافت'} برای فاکتور ${invoiceData.invoice_number}`
   }
@@ -596,6 +604,30 @@ const openTransactionWidgetForInvoice = async (invoiceData) => {
   } finally {
     transactionLookupLoading.value = false
   }
+}
+
+const resetInvoiceForm = async () => {
+  customer.value = null
+  warehouse.value = null
+  items.value = []
+  loadedInvoice.value = null
+  invoiceDiscount.value = 0
+  invoiceNumber.value = null
+  product.value = null
+  savedInvoiceForTransaction.value = null
+  showTransactionWidget.value = false
+  currentTransaction.value = null
+  transactionList.value = []
+  await fetchNewInvoiceNumber()
+}
+
+const fetchNewInvoiceNumber = async () => {
+  const response = await $api('invoices/lastid', { method: 'POST', body: { type: 'buy' } })
+  invoiceNumber.value = response.data
+}
+
+const startNewInvoice = async () => {
+  await resetInvoiceForm()
 }
 
 const loadExistingInvoice = async () => {
@@ -768,22 +800,14 @@ const submit = async () => {
       savedInvoice = response?.data || null
     }
 
-    await openTransactionWidgetForInvoice(savedInvoice)
-
-    if (loadedInvoice.value?.id) {
+    // بعد از ذخیره روی همان فاکتور بمانیم و حالت ویرایش را فعال کنیم
+    if (savedInvoice?.id) {
+      loadedInvoice.value = savedInvoice
+      invoiceNumber.value = savedInvoice.invoice_number
       await loadExistingInvoice()
-    } else {
-      // Reset form
-      customer.value = null
-      warehouse.value = null
-      items.value = []
-      loadedInvoice.value = null
-      invoiceDiscount.value = 0
-
-      // Get new invoice number
-      const response = await $api('invoices/lastid', { method: 'POST' })
-      invoiceNumber.value = response.data
     }
+
+    await openTransactionWidgetForInvoice(savedInvoice || loadedInvoice.value)
 
     // Swal.fire({
     //   icon: 'success',

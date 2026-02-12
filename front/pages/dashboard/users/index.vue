@@ -158,8 +158,8 @@
                   </span>
                 </td>
                 <td>
+                  {{ formatMoneyAbs(user.account_balance) }}
                   <span :class="balanceClass(user.account_balance)">
-                    {{ formatMoneyAbs(user.account_balance) }}
                     {{ balanceLabel(user.account_balance) }}
                   </span>
                 </td>
@@ -636,9 +636,9 @@ const balanceLabel = (value) => {
 
 const balanceClass = (value) => {
   const amount = Number(value || 0)
-  if (amount > 0) return 'btn p-0 text-warning fw-semibold'
-  if (amount < 0) return 'btn p-0 text-danger fw-semibold'
-  return 'btn p-0 text-success fw-semibold'
+  if (amount > 0) return 'btn p-1  btn-warning fw-semibold'
+  if (amount < 0) return 'btn p-1  btn-danger fw-semibold'
+  return 'btn p-1  btn-success fw-semibold'
 }
 
 const formatDate = (dateString) => {

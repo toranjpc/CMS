@@ -236,8 +236,7 @@
 
                       <div class="col-md-2">
                         <label class="form-label">قیمت اول دوره *</label>
-                        <input type="number" class="form-control" v-model="variant.firstPrice" step="0.01" min="0"
-                          placeholder="0" :readonly="isView" :required="!isView" />
+                        <widgets.CurrencyInput v-model="variant.firstPrice" inputClass="form-control" :readonly="isView" />
                       </div>
 
                       <div class="col-md-2">
@@ -327,6 +326,7 @@
 <script setup>
 import { watch, nextTick } from 'vue'
 import Swal from 'sweetalert2'
+import CurrencyInput from '@/components/widgets/CurrencyInput.vue'
 
 definePageMeta({
   layout: 'dashboard',

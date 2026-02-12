@@ -7,6 +7,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Accounting\Models\Product;
@@ -25,9 +26,14 @@ class ProductController extends Controller
         try {
             $Options = ProductOption::where("kind", "category");
 
-            $f_id = 0;
-            if (!empty(request('father'))) $f_id = request('father');
-            $Options = $Options->where('f_id', $f_id);
+            $parentId = request('father');
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
+            if ($parentId === null) {
+                $Options = $Options->whereNull('f_id');
+            } else {
+                $Options = $Options->where('f_id', $parentId);
+            }
 
             if (!empty(request('values'))) {
                 $values = request('values');
@@ -59,9 +65,12 @@ class ProductController extends Controller
     public function category_show($id = 0)
     {
         if ($id) {
-            $f_id = 0;
-            if (!empty(request('father'))) $f_id = request('father');
-            $category = ProductOption::select("id", "title")->where('kind', 'category')->where('f_id', $f_id)->find($id);
+            $parentId = request('father');
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+            $category = ProductOption::select("id", "title")
+                ->where('kind', 'category')
+                ->when($parentId === null, fn($q) => $q->whereNull('f_id'), fn($q) => $q->where('f_id', $parentId))
+                ->find($id);
             if (!$category) {
                 return response()->json([
                     "status" => "unsuccess",
@@ -82,6 +91,9 @@ class ProductController extends Controller
     public function category_store(Request $request)
     {
         try {
+            $parentId = $request->input('parent_id');
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -89,11 +101,16 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'category')
-                            ->whereNull('deleted_at'),
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'category')
+                                    ->whereNull('deleted_at');
+                            }),
                     ],
-                    'parent_id' => 'nullable|intiger',
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
                         $query->where('kind', 'category');
                     })],
@@ -114,7 +131,7 @@ class ProductController extends Controller
             );
 
             $category = ProductOption::create([
-                "f_id" => $data['parent_id'] ?? 0,
+                "f_id" => $parentId,
                 "title" => $data['title'],
                 "kind" => "category",
                 "option" => [],
@@ -142,6 +159,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ثبت دسته بندی رخ داد",
@@ -152,6 +170,9 @@ class ProductController extends Controller
     public function category_update(Request $request, ProductOption $category)
     {
         try {
+            $parentId = $request->input('parent_id', $category->f_id);
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -159,9 +180,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'category')
-                            ->whereNull('deleted_at')
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'category')
+                                    ->whereNull('deleted_at');
+                            })
                             ->ignore($category->id),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
@@ -182,7 +209,7 @@ class ProductController extends Controller
                 ]
             );
 
-            $category->f_id = $data['parent_id'] ?? 0;
+            $category->f_id = $parentId;
             $category->title = $data['title'];
             $category->updated_at = now();
             $category->update();
@@ -219,6 +246,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ویرایش دسته بندی رخ داد",
@@ -325,6 +353,9 @@ class ProductController extends Controller
     public function feature_store(Request $request)
     {
         try {
+            $parentId = $request->input('parent_id');
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -332,9 +363,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'option')
-                            ->whereNull('deleted_at'),
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'option')
+                                    ->whereNull('deleted_at');
+                            }),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
                         $query->where('kind', 'option');
@@ -358,7 +395,7 @@ class ProductController extends Controller
 
             $option = ["values" => $data['values'] ?? []];
             $feature = ProductOption::create([
-                "f_id" => $data['parent_id'] ?? 0,
+                "f_id" => $parentId,
                 "title" => $data['title'],
                 "kind" => "option",
                 "option" => $option,
@@ -387,6 +424,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ثبت ویژگی رخ داد",
@@ -397,6 +435,9 @@ class ProductController extends Controller
     public function feature_update(ProductOption $feature, Request $request)
     {
         try {
+            $parentId = $request->input('parent_id', $feature->f_id);
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -404,9 +445,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'option')
-                            ->whereNull('deleted_at')
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'option')
+                                    ->whereNull('deleted_at');
+                            })
                             ->ignore($feature->id),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
@@ -428,7 +475,7 @@ class ProductController extends Controller
                 ]
             );
 
-            $feature->f_id = $data['parent_id'] ?? 0;
+            $feature->f_id = $parentId;
             $feature->title = $data['title'];
 
             $option = $feature->option;
@@ -472,6 +519,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ویرایش ویژگی رخ داد",
@@ -578,6 +626,9 @@ class ProductController extends Controller
     public function brand_store(Request $request)
     {
         try {
+            $parentId = $request->input('parent_id');
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -585,9 +636,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'brand')
-                            ->whereNull('deleted_at'),
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'brand')
+                                    ->whereNull('deleted_at');
+                            }),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
                         $query->where('kind', 'brand');
@@ -609,7 +666,7 @@ class ProductController extends Controller
             );
 
             $brand = ProductOption::create([
-                "f_id" => $data['parent_id'] ?? 0,
+                "f_id" => $parentId,
                 "title" => $data['title'],
                 "kind" => "brand",
                 "option" => [],
@@ -637,6 +694,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ثبت برند رخ داد",
@@ -647,6 +705,9 @@ class ProductController extends Controller
     public function brand_update(Request $request, ProductOption $brand)
     {
         try {
+            $parentId = $request->input('parent_id', $brand->f_id);
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -654,9 +715,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'brand')
-                            ->whereNull('deleted_at')
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'brand')
+                                    ->whereNull('deleted_at');
+                            })
                             ->ignore($brand->id),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
@@ -677,7 +744,7 @@ class ProductController extends Controller
                 ]
             );
 
-            $brand->f_id = $data['parent_id'] ?? 0;
+            $brand->f_id = $parentId;
             $brand->title = $data['title'];
             $brand->updated_at = now();
             $brand->update();
@@ -714,6 +781,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ویرایش برند رخ داد",
@@ -820,6 +888,9 @@ class ProductController extends Controller
     public function unit_store(Request $request)
     {
         try {
+            $parentId = $request->input('parent_id');
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -827,9 +898,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'unit')
-                            ->whereNull('deleted_at'),
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'unit')
+                                    ->whereNull('deleted_at');
+                            }),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
                         $query->where('kind', 'unit');
@@ -851,7 +928,7 @@ class ProductController extends Controller
             );
 
             $unit = ProductOption::create([
-                "f_id" => $data['parent_id'] ?? 0,
+                "f_id" => $parentId,
                 "title" => $data['title'],
                 "kind" => "unit",
                 "option" => [],
@@ -879,6 +956,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ثبت برند رخ داد",
@@ -889,6 +967,9 @@ class ProductController extends Controller
     public function unit_update(Request $request, ProductOption $unit)
     {
         try {
+            $parentId = $request->input('parent_id', $unit->f_id);
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -896,9 +977,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'unit')
-                            ->whereNull('deleted_at')
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'unit')
+                                    ->whereNull('deleted_at');
+                            })
                             ->ignore($unit->id),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
@@ -919,7 +1006,7 @@ class ProductController extends Controller
                 ]
             );
 
-            $unit->f_id = $data['parent_id'] ?? 0;
+            $unit->f_id = $parentId;
             $unit->title = $data['title'];
             $unit->updated_at = now();
             $unit->update();
@@ -956,6 +1043,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ویرایش برند رخ داد",
@@ -1062,6 +1150,9 @@ class ProductController extends Controller
     public function warehouse_store(Request $request)
     {
         try {
+            $parentId = $request->input('parent_id');
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -1069,9 +1160,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'warehouse')
-                            ->whereNull('deleted_at'),
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'warehouse')
+                                    ->whereNull('deleted_at');
+                            }),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
                         $query->where('kind', 'warehouse');
@@ -1093,7 +1190,7 @@ class ProductController extends Controller
             );
 
             $warehouse = ProductOption::create([
-                "f_id" => $data['parent_id'] ?? 0,
+                "f_id" => $parentId,
                 "title" => $data['title'],
                 "kind" => "warehouse",
                 "option" => [],
@@ -1121,6 +1218,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ثبت برند رخ داد",
@@ -1131,6 +1229,9 @@ class ProductController extends Controller
     public function warehouse_update(Request $request, ProductOption $warehouse)
     {
         try {
+            $parentId = $request->input('parent_id', $warehouse->f_id);
+            $parentId = ($parentId === '0' || $parentId === 0 || $parentId === '') ? null : $parentId;
+
             $data = $request->validate(
                 [
                     'title' => [
@@ -1138,9 +1239,15 @@ class ProductController extends Controller
                         'string',
                         'max:255',
                         Rule::unique(ProductOption::class, 'title')
-                            ->where('f_id', 0)
-                            ->where('kind', 'warehouse')
-                            ->whereNull('deleted_at')
+                            ->where(function ($query) use ($parentId) {
+                                if ($parentId === null) {
+                                    $query->whereNull('f_id');
+                                } else {
+                                    $query->where('f_id', $parentId);
+                                }
+                                $query->where('kind', 'warehouse')
+                                    ->whereNull('deleted_at');
+                            })
                             ->ignore($warehouse->id),
                     ],
                     'parent_id' => ['nullable', 'integer', Rule::exists(ProductOption::class, 'id')->where(function ($query) {
@@ -1161,7 +1268,7 @@ class ProductController extends Controller
                 ]
             );
 
-            $warehouse->f_id = $data['parent_id'] ?? 0;
+            $warehouse->f_id = $parentId;
             $warehouse->title = $data['title'];
             $warehouse->updated_at = now();
             $warehouse->update();
@@ -1198,6 +1305,7 @@ class ProductController extends Controller
                 "errors" => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 "status" => "error",
                 "message" => "خطایی در ویرایش برند رخ داد",
