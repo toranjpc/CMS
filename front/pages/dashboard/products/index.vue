@@ -159,8 +159,8 @@
                     تخفیف)</small>
                 </td>
                 <td>
-                  <span class="badge" :class="getStockBadgeClass(product.firstWarehouse)">
-                    {{ product.firstWarehouse }}
+                  <span class="badge" :class="getStockBadgeClass(getProductStock(product))">
+                    {{ getProductStock(product) }}
                   </span>
                 </td>
                 <td>
@@ -621,6 +621,12 @@ const getStockBadgeClass = (stock) => {
   if (stock <= 0) return 'bg-danger'
   if (stock < 10) return 'bg-warning'
   return 'bg-success'
+}
+
+const getProductStock = (product) => {
+  const stock = product?.stock_balance ?? product?.firstWarehouse ?? 0
+  const numericStock = Number(stock)
+  return Number.isNaN(numericStock) ? 0 : numericStock
 }
 
 const formatPrice = (price) => {

@@ -51,30 +51,30 @@ class InvoiceItemObserver
 
     private function updateProductStock(InvoiceItem $invoiceItem): void
     {
-        $product = $invoiceItem->product;
-        if (!$product) return;
+        $productItem = $invoiceItem->productItem;
+        if (!$productItem) return;
 
         $quantity = $invoiceItem->quantity;
 
         if ($invoiceItem->type === 'buy') {
-            $product->increment('current_stock', $quantity);
+            $productItem->increment('current_stock', $quantity);
         } elseif ($invoiceItem->type === 'sell') {
-            $product->decrement('current_stock', $quantity);
+            $productItem->decrement('current_stock', $quantity);
         }
     }
 
     private function updateProductStockOnDelete(InvoiceItem $invoiceItem): void
     {
-        $product = $invoiceItem->product;
-        if (!$product) return;
+        $productItem = $invoiceItem->productItem;
+        if (!$productItem) return;
 
         $quantity = $invoiceItem->quantity;
 
         // Reverse the operation
         if ($invoiceItem->type === 'buy') {
-            $product->decrement('current_stock', $quantity);
+            $productItem->decrement('current_stock', $quantity);
         } elseif ($invoiceItem->type === 'sell') {
-            $product->increment('current_stock', $quantity);
+            $productItem->increment('current_stock', $quantity);
         }
     }
 }

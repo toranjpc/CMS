@@ -16,6 +16,7 @@ class Transaction extends Model
         'type',
         'transaction_number',
         'party_id',
+        'beneficiary_party_id',
         'amount',
         'payment_method',
         'invoice_id',
@@ -39,6 +40,12 @@ class Transaction extends Model
     public function party()
     {
         return $this->belongsTo(User::class, 'party_id');
+    }
+
+    // ذی‌نفع (شخص ثالث در روش حساب‌به‌حساب)
+    public function beneficiaryParty()
+    {
+        return $this->belongsTo(User::class, 'beneficiary_party_id');
     }
 
     // فاکتور مربوطه (اختیاری)

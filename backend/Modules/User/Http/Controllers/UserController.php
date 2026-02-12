@@ -9,6 +9,7 @@ use Modules\User\Models\Option;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -42,6 +43,41 @@ class UserController extends Controller
         }
 
         $users = $users->orderByDesc('id')->paginate(request("limit", 10));
+
+        // محاسبه مانده حساب کاربران در همان صفحه (دریافت - پرداخت)
+        $userIds = collect($users->items())->pluck('id')->filter()->values()->all();
+        $receiveSums = collect();
+        $paymentSums = collect();
+
+        if (!empty($userIds)) {
+            $receiveSums = DB::table('transactions')
+                ->whereIn('party_id', $userIds)
+                ->where('type', 'receive')
+                ->whereNull('deleted_at')
+                ->selectRaw('party_id, COALESCE(SUM(amount), 0) as total_amount')
+                ->groupBy('party_id')
+                ->pluck('total_amount', 'party_id');
+
+            $paymentSums = DB::table('transactions')
+                ->whereIn('party_id', $userIds)
+                ->where('type', 'payment')
+                ->whereNull('deleted_at')
+                ->selectRaw('party_id, COALESCE(SUM(amount), 0) as total_amount')
+                ->groupBy('party_id')
+                ->pluck('total_amount', 'party_id');
+        }
+
+        $users->setCollection(
+            $users->getCollection()->map(function ($user) use ($receiveSums, $paymentSums) {
+                $receive = (float) ($receiveSums[$user->id] ?? 0);
+                $payment = (float) ($paymentSums[$user->id] ?? 0);
+                $user->receive_total = $receive;
+                $user->payment_total = $payment;
+                $user->account_balance = $receive - $payment;
+                return $user;
+            })
+        );
+
         return response()->json(
             [
                 "status" => "success",

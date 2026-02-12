@@ -235,12 +235,15 @@ const submit = async () => {
   loading.value = true
 
   try {
-    await $api.post(`${baseUrl}/invoices`, {
-      customer_id: customer.value.id,
-      warehouse_id: warehouse.value.id,
-      invoice_date: invoiceDate.value,
-      items: items.value,
-      total: totals.value.final
+    await $api(`${baseUrl}/invoices`, {
+      method: 'POST',
+      body: {
+        customer_id: customer.value.id,
+        warehouse_id: warehouse.value.id,
+        invoice_date: invoiceDate.value,
+        items: items.value,
+        total: totals.value.final
+      }
     })
 
     Swal.fire('موفق', 'فاکتور ثبت شد', 'success')

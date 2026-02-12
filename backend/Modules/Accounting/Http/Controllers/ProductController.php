@@ -5,10 +5,13 @@ namespace Modules\Accounting\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Accounting\Models\Product;
 use Modules\Accounting\Models\ProductItem;
+use Modules\Accounting\Models\InvoiceItem;
 use Modules\Accounting\Models\ProductOption;
 use Modules\Accounting\Models\Invoice;
 use Modules\User\Models\ExtData;
@@ -1285,15 +1288,156 @@ class ProductController extends Controller
 
         $products = $products->orderByDesc('id')->paginate(request("limit", 10));
 
+        // موجودی لیست محصول: موجودی اول دوره + جمع خرید - جمع فروش
+        $productIds = collect($products->items())->pluck('id')->filter()->values()->toArray();
+        if (!empty($productIds)) {
+            $initialStocks = ProductItem::query()
+                ->selectRaw('f_id as product_id, COALESCE(SUM(firstWarehouse), 0) as initial_stock')
+                ->whereIn('f_id', $productIds)
+                ->groupBy('f_id')
+                ->pluck('initial_stock', 'product_id');
+
+            $buyQuantities = InvoiceItem::query()
+                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+                ->selectRaw('product_id, COALESCE(SUM(quantity), 0) as total_qty')
+                ->whereIn('product_id', $productIds)
+                ->where('invoices.type', 'buy')
+                ->whereNull('invoices.deleted_at')
+                ->groupBy('product_id')
+                ->pluck('total_qty', 'product_id');
+
+            $sellQuantities = InvoiceItem::query()
+                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+                ->selectRaw('product_id, COALESCE(SUM(quantity), 0) as total_qty')
+                ->whereIn('product_id', $productIds)
+                ->where('invoices.type', 'sell')
+                ->whereNull('invoices.deleted_at')
+                ->groupBy('product_id')
+                ->pluck('total_qty', 'product_id');
+
+            $products->getCollection()->transform(function ($product) use ($initialStocks, $buyQuantities, $sellQuantities) {
+                $initialStock = (int) ($initialStocks[$product->id] ?? 0);
+                $buyQty = (int) ($buyQuantities[$product->id] ?? 0);
+                $sellQty = (int) ($sellQuantities[$product->id] ?? 0);
+
+                $stockBalance = $initialStock + $buyQty - $sellQty;
+                // Keep backward compatibility for current front and also expose a clear key.
+                $product->firstWarehouse = $stockBalance;
+                $product->stock_balance = $stockBalance;
+
+                return $product;
+            });
+        }
+
         return response()->json([
             "status" => "success",
             "items" => $products
         ], 200);
     }
 
+    public function searchForInvoice()
+    {
+        $productItems = ProductItem::with([
+            'mainProduct' => function($query) {
+                $query->select('id', 'title', 'barcode');
+            }
+        ]);
+
+        if (!empty(request('values'))) {
+            $values = request('values');
+            $productItems = $productItems->where(function ($q) use ($values) {
+                $q->where('title', 'LIKE', '%' . $values . '%')
+                    ->orWhereHas('mainProduct', function($pq) use ($values) {
+                        $pq->where('title', 'LIKE', '%' . $values . '%')
+                            ->orWhere('barcode', 'LIKE', '%' . $values . '%');
+                    });
+            });
+        }
+
+        $productItems = $productItems->orderByDesc('id')->paginate(request("limit", 10));
+
+        // Add last used prices from invoices
+        $productItemIds = $productItems->pluck('id')->toArray();
+        $invoiceType = request('invoice_type', 'sell');
+
+        if (!empty($productItemIds)) {
+            $lastPrices = DB::table('invoice_items')
+                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+                ->whereIn('invoice_items.product_item_id', $productItemIds)
+                ->where('invoices.type', $invoiceType)
+                ->select('invoice_items.product_item_id', 'invoice_items.unit_price')
+                ->orderBy('invoices.date', 'desc')
+                ->get()
+                ->groupBy('product_item_id')
+                ->map(function($items) {
+                    return $items->first()->unit_price;
+                });
+
+            // Stock per variant: initial stock + buy quantities - sell quantities
+            $buyQuantities = DB::table('invoice_items')
+                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+                ->whereIn('product_item_id', $productItemIds)
+                ->where('invoices.type', 'buy')
+                ->whereNull('invoices.deleted_at')
+                ->selectRaw('product_item_id, COALESCE(SUM(quantity), 0) as total_qty')
+                ->groupBy('product_item_id')
+                ->pluck('total_qty', 'product_item_id');
+
+            $sellQuantities = DB::table('invoice_items')
+                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+                ->whereIn('product_item_id', $productItemIds)
+                ->where('invoices.type', 'sell')
+                ->whereNull('invoices.deleted_at')
+                ->selectRaw('product_item_id, COALESCE(SUM(quantity), 0) as total_qty')
+                ->groupBy('product_item_id')
+                ->pluck('total_qty', 'product_item_id');
+
+            // Add last prices and display names to product items
+            $productItems->getCollection()->transform(function($item) use ($lastPrices, $invoiceType, $buyQuantities, $sellQuantities) {
+                $item->last_used_price = $lastPrices->get($item->id);
+
+                // Add default price based on invoice type
+                if ($invoiceType === 'sell') {
+                    $item->default_price = $item->sell_price;
+                } else {
+                    $item->default_price = $item->firstPrice ?? $item->sell_price;
+                }
+
+                $initialStock = (int) ($item->firstWarehouse ?? 0);
+                $buyQty = (int) ($buyQuantities[$item->id] ?? 0);
+                $sellQty = (int) ($sellQuantities[$item->id] ?? 0);
+                $stockBalance = $initialStock + $buyQty - $sellQty;
+                $item->current_stock = $stockBalance;
+                $item->stock_balance = $stockBalance;
+
+                // Create display name: always "Product Name - Variant Name"
+                $mainProductTitle = $item->mainProduct ? $item->mainProduct->title : '';
+                $variantTitle = $item->title;
+
+                $item->display_name = $mainProductTitle . ' - ' . $variantTitle;
+
+                return $item;
+            });
+        }
+
+        return response()->json([
+            "status" => "success",
+            "items" => $productItems
+        ], 200);
+    }
+
     public function show($id)
     {
-        $Product = Product::with(['variants', 'categores', 'option', 'brand', 'unit', 'warehouse'])
+        $Product = Product::with([
+                'variants' => function($query) {
+                    $query->with('convertUnitRelation');
+                },
+                'categores',
+                'option',
+                'brand',
+                'unit',
+                'warehouse'
+            ])
             ->where('id', $id)
             ->withTrashed()
             ->first();
@@ -1335,6 +1479,9 @@ class ProductController extends Controller
                     'variants.*.current_stock' => 'nullable|integer',
                     'variants.*.sell_price' => 'nullable|decimal:0,2',
                     'variants.*.status' => 'nullable|integer',
+                    'variants.*.convertUnit' => 'nullable|boolean',
+                    'variants.*.UnitNumber' => 'nullable|integer',
+                    'variants.*.selectConvertUnit' => 'nullable|integer|exists:product_options,id',
 
                     // Form data
                     'form' => 'nullable|string',
@@ -1384,6 +1531,10 @@ class ProductController extends Controller
                     'variants.*.current_stock.integer' => 'موجودی فعلی باید عدد صحیح باشد',
                     'variants.*.sell_price.decimal' => 'قیمت فروش باید عدد باشد',
                     'variants.*.status.integer' => 'وضعیت تنوع معتبر نیست',
+                    'variants.*.convertUnit.boolean' => 'فیلد تبدیل واحد باید مقدار بولی داشته باشد',
+                    'variants.*.UnitNumber.integer' => 'تعداد واحد باید عدد صحیح باشد',
+                    'variants.*.selectConvertUnit.integer' => 'واحد تبدیل انتخاب شده معتبر نیست',
+                    'variants.*.selectConvertUnit.exists' => 'واحد تبدیل انتخاب شده یافت نشد',
 
                     'form.string' => 'فرم باید به صورت متن JSON ارسال شود',
 
@@ -1395,12 +1546,18 @@ class ProductController extends Controller
                 ]
             );
 
-            // Handle images if uploaded
+            // Handle images
             $albumData = null;
+
+            // اول album JSON رو پردازش کن
+            if ($request->has('album')) {
+                $albumPayload = json_decode($request->input('album'), true);
+                $albumData = $this->processAlbumPayload($albumPayload, $albumData);
+            }
+
+            // بعد تصاویر جدید رو آپلود کن
             if ($request->hasFile('images')) {
-                $albumData = $this->handleImageUploads($request->file('images'));
-            } elseif ($request->has('album')) {
-                $albumData = json_decode($request->input('album'), true);
+                $albumData = $this->handleImageUploads($request->file('images'), $albumData);
             }
 
             // Create main product
@@ -1430,6 +1587,9 @@ class ProductController extends Controller
                     'firstPrice' => $variant['firstPrice'] ?? 0,
                     'sell_price' => $variant['sell_price'] ?? 0,
                     'status' => $variant['status'] ?? 1,
+                    'convertUnit' => $variant['convertUnit'] ?? false,
+                    'UnitNumber' => $variant['UnitNumber'] ?? 0,
+                    'selectConvertUnit' => $variant['selectConvertUnit'] ?? null,
                 ]);
             }
 
@@ -1476,7 +1636,16 @@ class ProductController extends Controller
 
             return response()->json([
                 "status" => "success",
-                "data" => $mainProduct->load(['variants', 'categores', 'option', 'brand', 'unit', 'warehouse']),
+                "data" => $mainProduct->load([
+                    'variants' => function($query) {
+                        $query->with('convertUnitRelation');
+                    },
+                    'categores',
+                    'option',
+                    'brand',
+                    'unit',
+                    'warehouse'
+                ]),
                 "message" => "محصول با موفقیت ایجاد شد"
             ], 201);
         } catch (ValidationException $e) {
@@ -1517,12 +1686,16 @@ class ProductController extends Controller
 
                     // Variants
                     'variants' => 'required|array|min:1',
+                    'variants.*.id' => 'nullable|integer|exists:product_items,id',
                     'variants.*.title' => 'required|string|max:255',
                     'variants.*.firstWarehouse' => 'nullable|integer',
                     'variants.*.firstPrice' => 'nullable|decimal:0,2',
                     'variants.*.current_stock' => 'nullable|integer',
                     'variants.*.sell_price' => 'nullable|decimal:0,2',
                     'variants.*.status' => 'nullable|integer',
+                    'variants.*.convertUnit' => 'nullable|boolean',
+                    'variants.*.UnitNumber' => 'nullable|integer',
+                    'variants.*.selectConvertUnit' => 'nullable|integer|exists:product_options,id',
 
                     // Form data
                     'form' => 'nullable|string',
@@ -1563,6 +1736,8 @@ class ProductController extends Controller
                     'variants.required' => 'حداقل یک تنوع محصول الزامی است',
                     'variants.array' => 'تنوع‌ها باید به صورت آرایه ارسال شوند',
                     'variants.min' => 'حداقل یک تنوع باید تعریف شود',
+                    'variants.*.id.integer' => 'شناسه تنوع معتبر نیست',
+                    'variants.*.id.exists' => 'تنوع مورد نظر یافت نشد',
                     'variants.*.title.required' => 'عنوان تنوع الزامی است',
                     'variants.*.title.string' => 'عنوان تنوع باید متن باشد',
                     'variants.*.title.max' => 'عنوان تنوع نباید بیشتر از ۲۵۵ کاراکتر باشد',
@@ -1572,6 +1747,10 @@ class ProductController extends Controller
                     'variants.*.current_stock.integer' => 'موجودی فعلی باید عدد صحیح باشد',
                     'variants.*.sell_price.decimal' => 'قیمت فروش باید عدد باشد',
                     'variants.*.status.integer' => 'وضعیت تنوع معتبر نیست',
+                    'variants.*.convertUnit.boolean' => 'فیلد تبدیل واحد باید مقدار بولی داشته باشد',
+                    'variants.*.UnitNumber.integer' => 'تعداد واحد باید عدد صحیح باشد',
+                    'variants.*.selectConvertUnit.integer' => 'واحد تبدیل انتخاب شده معتبر نیست',
+                    'variants.*.selectConvertUnit.exists' => 'واحد تبدیل انتخاب شده یافت نشد',
 
                     'form.string' => 'فرم باید به صورت متن JSON ارسال شود',
 
@@ -1588,11 +1767,16 @@ class ProductController extends Controller
 
             // Handle images
             $albumData = $mainProduct->album; // Keep existing album
-            if ($request->hasFile('images')) {
-                $albumData = $this->handleImageUploads($request->file('images'), $albumData);
-            } elseif ($request->has('album')) {
+
+            // اول album JSON رو پردازش کن (حذف‌ها و تصاویر موجود)
+            if ($request->has('album')) {
                 $albumPayload = json_decode($request->input('album'), true);
                 $albumData = $this->processAlbumPayload($albumPayload, $albumData);
+            }
+
+            // بعد تصاویر جدید رو آپلود کن (اضافه به آلبوم)
+            if ($request->hasFile('images')) {
+                $albumData = $this->handleImageUploads($request->file('images'), $albumData);
             }
 
             // Update main product
@@ -1609,11 +1793,19 @@ class ProductController extends Controller
                 'status' => $data['status'] ?? 1,
             ]);
 
-            // Delete existing variants and recreate them
-            ProductItem::where('f_id', $mainProduct->id)->delete();
+            // مدیریت تنوع‌ها: آپدیت موجود، ساخت جدید، حذف اضافی
+            $sentVariantIds = collect($data['variants'])
+                ->pluck('id')
+                ->filter()
+                ->toArray();
+
+            // حذف تنوع‌هایی که دیگه ارسال نشدن
+            ProductItem::where('f_id', $mainProduct->id)
+                ->whereNotIn('id', $sentVariantIds)
+                ->delete();
 
             foreach ($data['variants'] as $variant) {
-                ProductItem::create([
+                $variantData = [
                     'user_id' => Auth::id() ?? 1,
                     'f_id' => $mainProduct->id,
                     'title' => $variant['title'] ?: $data['title'],
@@ -1622,7 +1814,18 @@ class ProductController extends Controller
                     'firstPrice' => $variant['firstPrice'] ?? 0,
                     'sell_price' => $variant['sell_price'] ?? 0,
                     'status' => $variant['status'] ?? 1,
-                ]);
+                    'convertUnit' => $variant['convertUnit'] ?? false,
+                    'UnitNumber' => $variant['UnitNumber'] ?? 0,
+                    'selectConvertUnit' => $variant['selectConvertUnit'] ?? null,
+                ];
+
+                if (!empty($variant['id'])) {
+                    // آپدیت تنوع موجود
+                    ProductItem::where('id', $variant['id'])->update($variantData);
+                } else {
+                    // ساخت تنوع جدید
+                    ProductItem::create($variantData);
+                }
             }
 
             // Update relationships
@@ -1677,7 +1880,16 @@ class ProductController extends Controller
 
             return response()->json([
                 "status" => "success",
-                "data" => $mainProduct->load(['variants', 'categores', 'option', 'brand', 'unit', 'warehouse']),
+                "data" => $mainProduct->load([
+                    'variants' => function($query) {
+                        $query->with('convertUnitRelation');
+                    },
+                    'categores',
+                    'option',
+                    'brand',
+                    'unit',
+                    'warehouse'
+                ]),
                 "message" => "محصول با موفقیت ویرایش شد"
             ], 200);
         } catch (ValidationException $e) {
@@ -1695,19 +1907,16 @@ class ProductController extends Controller
 
     private function handleImageUploads(array $images, array $existingAlbum = null)
     {
-        $album = $existingAlbum ?: ['existing' => [], 'new' => [], 'removed' => []];
-        $index = count($album['existing']) + count($album['new']);
+        $album = $existingAlbum ?: [];
 
         foreach ($images as $image) {
             $extension = strtolower($image->getClientOriginalExtension());
             $filename = uniqid() . '.' . $extension;
-            $path = $image->storeAs('products', $filename, 'public');
+            $image->storeAs('products', $filename, 'public');
 
-            $album['new'][] = [
-                'index' => $index++,
-                'filename' => $filename,
+            $album[] = [
                 'url' => asset('storage/products/' . $filename),
-                'thumb' => asset('storage/products/' . $filename), // You can generate thumbnail here
+                'thumb' => asset('storage/products/' . $filename),
             ];
         }
 
@@ -1716,22 +1925,26 @@ class ProductController extends Controller
 
     private function processAlbumPayload(array $albumPayload, array $existingAlbum = null)
     {
-        $album = ['existing' => [], 'new' => [], 'removed' => []];
+        $album = [];
 
-        // Process existing images
+        // نگه داشتن تصاویر موجود
         if (isset($albumPayload['existing'])) {
-            $album['existing'] = $albumPayload['existing'];
+            foreach ($albumPayload['existing'] as $img) {
+                $album[] = [
+                    'url' => $img['url'],
+                    'thumb' => $img['thumb'] ?? $img['url'],
+                ];
+            }
         }
 
-        // Process new images
-        if (isset($albumPayload['new'])) {
-            $album['new'] = $albumPayload['new'];
-        }
-
-        // Process removed images
+        // حذف فایل تصاویر حذف شده از storage
         if (isset($albumPayload['removed'])) {
-            $album['removed'] = $albumPayload['removed'];
-            // Here you can delete actual files from storage if needed
+            foreach ($albumPayload['removed'] as $removedImage) {
+                $filename = $removedImage['filename'] ?? basename($removedImage['url'] ?? '');
+                if ($filename) {
+                    Storage::disk('public')->delete('products/' . $filename);
+                }
+            }
         }
 
         return $album;

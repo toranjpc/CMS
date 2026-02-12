@@ -121,7 +121,7 @@ const previousIdValue = ref('')
 const previousTextValue = ref('')
 const searchByTextDialog = ref(false)
 // const searchableID = ref(props.def);
-const searchableID = ref(props.modelValue)
+const searchableID = ref(props.modelValue && typeof props.modelValue === 'object' ? props.modelValue.id : props.modelValue)
 const searchResultLable = ref(null);
 const paginatePage = ref(1);
 const paginate = ref([]);
@@ -310,13 +310,14 @@ watch(searchByTextDialog, (newVal) => {
             }
         })
     }
+})
 
-    () => props.modelValue,
-        (val) => {
-            searchableID.value = val
-        }
-
-
+watch(() => props.modelValue, (val) => {
+    if (val && typeof val === 'object') {
+        searchableID.value = val.id
+    } else {
+        searchableID.value = val
+    }
 })
 </script>
 

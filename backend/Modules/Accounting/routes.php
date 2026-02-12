@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Accounting\Http\Controllers\ProductController;
+use Modules\Accounting\Http\Controllers\InvoiceController;
+use Modules\Accounting\Http\Controllers\TransactionController;
 
 
 
@@ -71,6 +73,7 @@ Route::prefix('products')
 
         Route::get('/', [ProductController::class, 'index'])->name('index');
         Route::post('/list', [ProductController::class, 'index'])->name('indexSearch');
+        Route::post('/search-for-invoice', [ProductController::class, 'searchForInvoice'])->name('searchForInvoice');
         Route::post('{id}', [ProductController::class, 'show'])->name('show');
         Route::post('/', [ProductController::class, 'store'])->name('store');
         Route::put('{id}', [ProductController::class, 'update'])->name('update');
@@ -82,16 +85,36 @@ Route::prefix('products')
 
 Route::prefix('invoices')
     ->name('invoices.')
-    ->middleware(['api', 'checkPermission'])
-    ->group(function () { //'auth:sanctum', 
+    ->middleware(['api', 'auth:sanctum', 'checkPermission'])
+    ->group(function () { //'auth:sanctum',
 
-        Route::post('lastid', [ProductController::class, 'lastid'])->name('lastid');
+        Route::post('lastid', [InvoiceController::class, 'lastid'])->name('lastid');
+        Route::post('show-by-number', [InvoiceController::class, 'showByNumber'])->name('showByNumber');
 
-        Route::get('/', [ProductController::class, 'index'])->name('index');
-        Route::post('{id}', [ProductController::class, 'show'])->name('show');
-        Route::post('/', [ProductController::class, 'store'])->name('store');
-        Route::put('{id}', [ProductController::class, 'update'])->name('update');
-        Route::delete('{product}', [ProductController::class, 'destroy'])->name('destroy');
-        Route::delete('{id}/force', [ProductController::class, 'force_destroy'])->name('forceDestroy');
-        Route::patch('{id}/restore', [ProductController::class, 'restore'])->name('restore');
+        Route::get('/', [InvoiceController::class, 'index'])->name('index');
+        Route::post('{id}', [InvoiceController::class, 'show'])->name('show');
+        Route::post('/', [InvoiceController::class, 'store'])->name('store');
+        Route::put('{id}', [InvoiceController::class, 'update'])->name('update');
+        Route::delete('{id}', [InvoiceController::class, 'destroy'])->name('destroy');
+        Route::delete('{id}/force', [InvoiceController::class, 'force_destroy'])->name('forceDestroy');
+        Route::patch('{id}/restore', [InvoiceController::class, 'restore'])->name('restore');
+    });
+
+
+Route::prefix('transactions')
+    ->name('transactions.')
+    ->middleware(['api', 'auth:sanctum', 'checkPermission'])
+    ->group(function () {
+
+        Route::post('lastid', [TransactionController::class, 'lastid'])->name('lastid');
+        Route::post('show-by-number', [TransactionController::class, 'showByNumber'])->name('showByNumber');
+
+        Route::get('/', [TransactionController::class, 'index'])->name('index');
+        Route::post('/list', [TransactionController::class, 'index'])->name('indexSearch');
+        Route::post('{id}', [TransactionController::class, 'show'])->name('show');
+        Route::post('/', [TransactionController::class, 'store'])->name('store');
+        Route::put('{id}', [TransactionController::class, 'update'])->name('update');
+        Route::delete('{id}', [TransactionController::class, 'destroy'])->name('destroy');
+        Route::delete('{id}/force', [TransactionController::class, 'force_destroy'])->name('forceDestroy');
+        Route::patch('{id}/restore', [TransactionController::class, 'restore'])->name('restore');
     });

@@ -47,9 +47,14 @@ return new class extends Migration
             $table->decimal('firstPrice', 15, 2)->default(0);
             $table->decimal('sell_price', 15, 2)->default(0);
 
+            $table->boolean('convertUnit')->default(false);
+            $table->integer('UnitNumber')->default(0);
+            $table->unsignedBigInteger('selectConvertUnit')->nullable();
+            $table->foreign('selectConvertUnit')->references('id')->on('product_options')->nullOnDelete();
+
+
             $table->tinyInteger('status')->default(1);
             $table->timestamps();
-            $table->softDeletes();
         });
 
 
@@ -99,6 +104,7 @@ return new class extends Migration
             // $table->foreignId('invoice_id')->constrained()->cascadeOnDelete();
             $table->foreignIdFor(Invoice::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(Product::class)->constrained()->cascadeOnDelete();
+            $table->foreignId('product_item_id')->nullable()->constrained('product_items')->nullOnDelete();
             $table->integer('quantity')->default(1);
             $table->decimal('unit_price', 15, 2);
             $table->decimal('total_price', 15, 2);

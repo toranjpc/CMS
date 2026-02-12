@@ -4,12 +4,11 @@ namespace Modules\Accounting\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\User\Models\ExtData;
 
 class ProductItem extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
         'user_id',
@@ -20,6 +19,9 @@ class ProductItem extends Model
         'firstPrice',
         'sell_price',
         'status',
+        'convertUnit',
+        'UnitNumber',
+        'selectConvertUnit',
     ];
 
     protected $casts = [
@@ -27,6 +29,9 @@ class ProductItem extends Model
         'sell_price' => 'decimal:2',
         'firstWarehouse' => 'integer',
         'current_stock' => 'integer',
+        'convertUnit' => 'boolean',
+        'UnitNumber' => 'integer',
+        'selectConvertUnit' => 'integer',
     ];
 
     // Relationships
@@ -104,5 +109,11 @@ class ProductItem extends Model
         )
             ->where('extdatas.kind', 'ProductWarehouse')
             ->where('product_options.kind', 'warehouse');
+    }
+
+    public function convertUnitRelation()
+    {
+        return $this->belongsTo(ProductOption::class, 'selectConvertUnit', 'id')
+            ->where('kind', 'unit');
     }
 }

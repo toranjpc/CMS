@@ -16,7 +16,7 @@ class Invoice extends Model
         'type',
         'invoice_number',
         'party_id',
-        'invoice_date',
+        'date',
         'subtotal',
         'discount',
         'tax',
@@ -27,7 +27,7 @@ class Invoice extends Model
     ];
 
     protected $casts = [
-        'invoice_date' => 'date',
+        'date' => 'date',
         'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
         'tax' => 'decimal:2',

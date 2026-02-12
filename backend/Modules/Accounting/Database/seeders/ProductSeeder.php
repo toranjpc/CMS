@@ -22,31 +22,139 @@ class ProductSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $categories = [
-            'موبایل',
-            'لپ‌تاپ',
-            'لوازم جانبی',
-        ];
+        // ساختار سه سطحی دسته‌بندی‌ها ایجاد می‌شود
 
         $brands = [
-            'Apple',
-            'Samsung',
-            'Asus',
+            'Royal Canin',
+            'Pedigree',
+            'Whiskas',
+            'Purina',
         ];
 
         $units = [
-            'عدد',
-            'کارتن',
+            'کیلو',
+            'کیسه',
+            'قوطی',
+            'بسته',
         ];
 
         $categoryOptions = [];
-        foreach ($categories as $title) {
-            $categoryOptions[$title] = ProductOption::create([
-                'title' => $title,
-                'kind'  => 'category',
-                'status' => 1,
-            ]);
-        }
+
+        // ایجاد سطح اول: نوع حیوان
+        $dogCategory = ProductOption::create([
+            'title' => 'سگ',
+            'f_id' => 0,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['سگ'] = $dogCategory;
+
+        $catCategory = ProductOption::create([
+            'title' => 'گربه',
+            'f_id' => 0,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['گربه'] = $catCategory;
+
+        $birdCategory = ProductOption::create([
+            'title' => 'پرنده',
+            'f_id' => 0,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['پرنده'] = $birdCategory;
+
+        // سطح دوم: انواع غذا برای سگ
+        $dogDryFood = ProductOption::create([
+            'title' => 'غذای خشک',
+            'f_id' => $dogCategory->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['غذای خشک سگ'] = $dogDryFood;
+
+        $dogWetFood = ProductOption::create([
+            'title' => 'غذای تر',
+            'f_id' => $dogCategory->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['غذای تر سگ'] = $dogWetFood;
+
+        $dogCanFood = ProductOption::create([
+            'title' => 'کنسرو',
+            'f_id' => $dogCategory->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['کنسرو سگ'] = $dogCanFood;
+
+        // سطح دوم: انواع غذا برای گربه
+        $catDryFood = ProductOption::create([
+            'title' => 'غذای خشک',
+            'f_id' => $catCategory->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['غذای خشک گربه'] = $catDryFood;
+
+        $catWetFood = ProductOption::create([
+            'title' => 'غذای تر',
+            'f_id' => $catCategory->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['غذای تر گربه'] = $catWetFood;
+
+        $catCanFood = ProductOption::create([
+            'title' => 'کنسرو',
+            'f_id' => $catCategory->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['کنسرو گربه'] = $catCanFood;
+
+        // سطح سوم: سن حیوانات
+        $dogPuppy = ProductOption::create([
+            'title' => 'بچه',
+            'f_id' => $dogDryFood->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['بچه سگ'] = $dogPuppy;
+
+        $dogAdult = ProductOption::create([
+            'title' => 'بزرگسال',
+            'f_id' => $dogDryFood->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['بزرگسال سگ'] = $dogAdult;
+
+        $dogSenior = ProductOption::create([
+            'title' => 'کهنه‌کار',
+            'f_id' => $dogDryFood->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['کهنه‌کار سگ'] = $dogSenior;
+
+        $catKitten = ProductOption::create([
+            'title' => 'بچه',
+            'f_id' => $catWetFood->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['بچه گربه'] = $catKitten;
+
+        $catAdult = ProductOption::create([
+            'title' => 'بزرگسال',
+            'f_id' => $catDryFood->id,
+            'kind' => 'category',
+            'status' => 1,
+        ]);
+        $categoryOptions['بزرگسال گربه'] = $catAdult;
 
         $brandOptions = [];
         foreach ($brands as $title) {
@@ -74,32 +182,104 @@ class ProductSeeder extends Seeder
 
         $products = [
             [
-                'title' => 'iPhone 15',
-                'barcode' => '123',
-                'category' => 'موبایل',
-                'brand' => 'Apple',
+                'title' => 'غذای خشک سگ بزرگ‌سال',
+                'barcode' => 'DOG001',
+                'categories' => ['سگ', 'غذای خشک سگ', 'بزرگسال سگ'],
+                'brand' => 'Royal Canin',
+                'unit' => 'کیسه',
                 'variants' => [
-                    ['title' => '128GB', 'price' => 85000000, 'stock' => 10],
-                    ['title' => '256GB', 'price' => 92000000, 'stock' => 5],
+                    [
+                        'title' => '۱۰ کیلویی',
+                        'price' => 2500000,
+                        'stock' => 15,
+                        'convertUnit' => true,
+                        'UnitNumber' => 10,
+                        'convertUnitTitle' => 'کیلو'
+                    ],
+                    [
+                        'title' => '۲۰ کیلویی',
+                        'price' => 4800000,
+                        'stock' => 8,
+                        'convertUnit' => true,
+                        'UnitNumber' => 20,
+                        'convertUnitTitle' => 'کیلو'
+                    ],
                 ],
             ],
             [
-                'title' => 'Galaxy S24',
-                'barcode' => '456',
-                'category' => 'موبایل',
-                'brand' => 'Samsung',
+                'title' => 'کنسرو گوشت گوساله برای سگ',
+                'barcode' => 'DOG002',
+                'categories' => ['سگ', 'کنسرو سگ'],
+                'brand' => 'Pedigree',
+                'unit' => 'قوطی',
                 'variants' => [
-                    ['title' => '256GB', 'price' => 78000000, 'stock' => 7],
+                    [
+                        'title' => '۴۰۰ گرمی',
+                        'price' => 85000,
+                        'stock' => 25,
+                        'convertUnit' => false,
+                        'UnitNumber' => 0,
+                        'convertUnitTitle' => null
+                    ],
+                    [
+                        'title' => '۸۰۰ گرمی',
+                        'price' => 160000,
+                        'stock' => 12,
+                        'convertUnit' => false,
+                        'UnitNumber' => 0,
+                        'convertUnitTitle' => null
+                    ],
                 ],
             ],
             [
-                'title' => 'Asus VivoBook',
-                'barcode' => '789',
-                'category' => 'لپ‌تاپ',
-                'brand' => 'Asus',
+                'title' => 'غذای مرطوب گربه بچه',
+                'barcode' => 'CAT001',
+                'categories' => ['گربه', 'غذای تر گربه', 'بچه گربه'],
+                'brand' => 'Whiskas',
+                'unit' => 'کیسه',
                 'variants' => [
-                    ['title' => 'Core i5', 'price' => 54000000, 'stock' => 4],
-                    ['title' => 'Core i7', 'price' => 67000000, 'stock' => 2],
+                    [
+                        'title' => '۱۰۰ گرمی × ۵ بسته',
+                        'price' => 125000,
+                        'stock' => 30,
+                        'convertUnit' => true,
+                        'UnitNumber' => 5,
+                        'convertUnitTitle' => 'بسته'
+                    ],
+                ],
+            ],
+            [
+                'title' => 'غذای خشک گربه بزرگ‌سال',
+                'barcode' => 'CAT002',
+                'categories' => ['گربه', 'غذای خشک گربه', 'بزرگسال گربه'],
+                'brand' => 'Purina',
+                'unit' => 'کیسه',
+                'variants' => [
+                    [
+                        'title' => '۵ کیلویی',
+                        'price' => 1200000,
+                        'stock' => 20,
+                        'convertUnit' => true,
+                        'UnitNumber' => 5,
+                        'convertUnitTitle' => 'کیلو'
+                    ],
+                ],
+            ],
+            [
+                'title' => 'غذای خشک سگ بچه',
+                'barcode' => 'DOG003',
+                'categories' => ['سگ', 'غذای خشک سگ', 'بچه سگ'],
+                'brand' => 'Royal Canin',
+                'unit' => 'کیسه',
+                'variants' => [
+                    [
+                        'title' => '۲ کیلویی',
+                        'price' => 550000,
+                        'stock' => 25,
+                        'convertUnit' => true,
+                        'UnitNumber' => 2,
+                        'convertUnitTitle' => 'کیلو'
+                    ],
                 ],
             ],
         ];
@@ -120,14 +300,21 @@ class ProductSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
-            | Attach Category
+            | Attach Categories (Three Levels)
             |--------------------------------------------------------------------------
             */
-            ExtData::create([
-                'f_id' => $product->id,
-                'm_id' => $categoryOptions[$p['category']]->id,
-                'kind' => 'UserCategory',
-            ]);
+            if (isset($p['categories']) && is_array($p['categories'])) {
+                foreach ($p['categories'] as $categoryName) {
+                    if (isset($categoryOptions[$categoryName])) {
+                        ExtData::create([
+                            'f_id' => $product->id,
+                            'm_id' => $categoryOptions[$categoryName]->id,
+                            'kind' => 'ProductCategory',
+                            'status' => 1,
+                        ]);
+                    }
+                }
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -137,8 +324,23 @@ class ProductSeeder extends Seeder
             ExtData::create([
                 'f_id' => $product->id,
                 'm_id' => $brandOptions[$p['brand']]->id,
-                'kind' => 'UserBrand',
+                'kind' => 'ProductBrand',
+                'status' => 1,
             ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Attach Unit
+            |--------------------------------------------------------------------------
+            */
+            if (isset($p['unit']) && isset($unitOptions[$p['unit']])) {
+                ExtData::create([
+                    'f_id' => $product->id,
+                    'm_id' => $unitOptions[$p['unit']]->id,
+                    'kind' => 'ProductUnit',
+                    'status' => 1,
+                ]);
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -146,15 +348,23 @@ class ProductSeeder extends Seeder
             |--------------------------------------------------------------------------
             */
             foreach ($p['variants'] as $v) {
+                $convertUnitId = null;
+                if ($v['convertUnit'] && isset($v['convertUnitTitle']) && isset($unitOptions[$v['convertUnitTitle']])) {
+                    $convertUnitId = $unitOptions[$v['convertUnitTitle']]->id;
+                }
+
                 ProductItem::create([
-                    'user_id'       => $user?->id,
-                    'f_id'          => $product->id,
-                    'title'         => $v['title'],
-                    'firstWarehouse' => $v['stock'],
-                    'current_stock' => $v['stock'],
-                    'firstPrice'    => $v['price'],
-                    'sell_price'    => $v['price'],
-                    'status'        => 1,
+                    'user_id'           => $user?->id,
+                    'f_id'              => $product->id,
+                    'title'             => $v['title'],
+                    'firstWarehouse'    => $v['stock'],
+                    'current_stock'     => $v['stock'],
+                    'firstPrice'        => $v['price'],
+                    'sell_price'        => $v['price'],
+                    'status'            => 1,
+                    'convertUnit'       => $v['convertUnit'] ?? false,
+                    'UnitNumber'        => $v['UnitNumber'] ?? 0,
+                    'selectConvertUnit' => $convertUnitId,
                 ]);
             }
         }

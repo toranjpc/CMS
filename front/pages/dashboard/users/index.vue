@@ -103,6 +103,7 @@
                 <th width="6%">کد ملی</th>
                 <th width="6%">نوع</th>
                 <th width="8%">نقش</th>
+                <th width="10%">مانده حساب</th>
                 <th width="10%">تاریخ ایجاد</th>
               </tr>
             </thead>
@@ -157,12 +158,18 @@
                   </span>
                 </td>
                 <td>
+                  <span :class="balanceClass(user.account_balance)">
+                    {{ formatMoneyAbs(user.account_balance) }}
+                    {{ balanceLabel(user.account_balance) }}
+                  </span>
+                </td>
+                <td>
                   <small class="" dir="ltr" v-html="formatDate(user.created_at)"></small>
                 </td>
               </tr>
               <!-- Empty State -->
               <tr v-if="totalitems === 0">
-                <td colspan="8" class="text-center py-5">
+                <td colspan="9" class="text-center py-5">
                   <div class="text-muted">
                     <i class="fa fa-users display-4 mb-3"></i>
                     <div>هیچ کاربری یافت نشد</div>
@@ -293,8 +300,8 @@
                 <div class="col-md-6">
                   <label class="form-label">تاریخ تولد</label>
                   <input type="text" autocomplete="OFF" class="form-control"
-                    :value="formatPersianDate(currentUser.birth_date)"
-                    :readonly="modalMode === 'view'" placeholder="مثال: ۱۳۷۰/۰۱/۰۱" />
+                    :value="formatPersianDate(currentUser.birth_date)" :readonly="modalMode === 'view'"
+                    placeholder="مثال: ۱۳۷۰/۰۱/۰۱" />
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">کد پستی</label>
@@ -614,6 +621,26 @@ const getTypeBadgeClass = (type) => {
   return classes[type] || 'bg-secondary'
 }
 
+const formatMoneyAbs = (value) => {
+  const amount = Math.abs(Number(value || 0))
+  if (!amount) return ''
+  return new Intl.NumberFormat('fa-IR').format(amount)
+}
+
+const balanceLabel = (value) => {
+  const amount = Number(value || 0)
+  if (amount > 0) return 'بِس'
+  if (amount < 0) return 'بِد'
+  return 'بی حساب'
+}
+
+const balanceClass = (value) => {
+  const amount = Number(value || 0)
+  if (amount > 0) return 'btn p-0 text-warning fw-semibold'
+  if (amount < 0) return 'btn p-0 text-danger fw-semibold'
+  return 'btn p-0 text-success fw-semibold'
+}
+
 const formatDate = (dateString) => {
   if (!dateString) return '-'
   let dateinit = new Date(dateString)
@@ -623,7 +650,7 @@ const formatDate = (dateString) => {
 }
 
 // تبدیل تاریخ میلادی به فارسی برای نمایش
-const formatPersianDate = (dateString=null) => {
+const formatPersianDate = (dateString = null) => {
   if (!dateString) {
     // اگر تاریخ خالی بود، تاریخ روز را برگردان
     const today = new Date()

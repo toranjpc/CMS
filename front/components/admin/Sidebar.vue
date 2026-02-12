@@ -111,14 +111,30 @@
             </NuxtLink>
           </li>
           <li>
+            <NuxtLink to="/dashboard/Accounting/buy_list" :class="{ active: isActive('/dashboard/Accounting/buy_list') }">
+              لیست فاکتورهای خرید
+            </NuxtLink>
+          </li>
+          <li>
             <NuxtLink to="/dashboard/Accounting/sell_factor" :class="{ active: isActive('/dashboard/Accounting/sell_factor') }">
-             فاکتور فروش  
+             فاکتور فروش
+            </NuxtLink>
+          </li>
+          <li>
+            <NuxtLink to="/dashboard/Accounting/sell_list" :class="{ active: isActive('/dashboard/Accounting/sell_list') }">
+              لیست فاکتورهای فروش
             </NuxtLink>
           </li>
           <li>
             <NuxtLink to="/dashboard/Accounting/pay_receipt"
               :class="{ active: isActive('/dashboard/Accounting/pay_receipt') }">
-              عملیات دریافت/ پرداخت
+              ثبت سند دریافت/پرداخت
+            </NuxtLink>
+          </li>
+          <li>
+            <NuxtLink to="/dashboard/Accounting/pay_receipt_list"
+              :class="{ active: isActive('/dashboard/Accounting/pay_receipt_list') }">
+              لیست اسناد دریافت/پرداخت
             </NuxtLink>
           </li>
 

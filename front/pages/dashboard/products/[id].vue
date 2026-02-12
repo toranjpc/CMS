@@ -95,7 +95,7 @@
                     <div class="col-md-4">
                       <label class="form-label small">دسته‌بندی اصلی
                         <span v-if="selectedMainCategory"> : {{ selectedMainCategory.title || selectedMainCategory
-                          }}</span>
+                        }}</span>
                       </label>
                       <widgets.searchinput v-model="selectedMainCategory" placeholder="دسته‌بندی اصلی"
                         textSearchUrl="/products/categories/list" idSearchUrl="/products/categories/" methode="GET"
@@ -106,7 +106,7 @@
                     <div class="col-md-4">
                       <label class="form-label small">دسته‌بندی فرزند
                         <span v-if="selectedSubCategory"> : {{ selectedSubCategory.title || selectedSubCategory
-                          }}</span>
+                        }}</span>
                       </label>
                       <widgets.searchinput v-model="selectedSubCategory" placeholder="دسته‌بندی فرزند"
                         textSearchUrl="/products/categories/list" idSearchUrl="/products/categories/"
@@ -119,7 +119,7 @@
                     <div class="col-md-4">
                       <label class="form-label small">دسته‌بندی فرزند دوم
                         <span v-if="selectedSubSubCategory"> : {{ selectedSubSubCategory.title || selectedSubSubCategory
-                        }}</span>
+                          }}</span>
                       </label>
                       <widgets.searchinput v-model="selectedSubSubCategory" placeholder="دسته‌بندی فرزند دوم"
                         textSearchUrl="/products/categories/list" idSearchUrl="/products/categories/"
@@ -249,7 +249,10 @@
                       <div class="col-md-3">
                         <label class="form-label" for="convertUnit">تبدیل واحد </label>
                         <input type="checkbox" class="mx-2" id="convertUnit" v-model="variant.convertUnit"
-                          :readonly="isView" value="1" @change="variant.UnitNumber = 0" />
+                          :readonly="isView" value="1" @change="variant.UnitNumber = 0; variant.selectConvertUnit = 0" />
+                        <span v-if="variant.convertUnit && variant.convert_unit_relation">({{
+                          variant.convert_unit_relation.title
+                        }})</span>
                         <div class="d-flex">
                           <div>
                             <input type="number" class="form-control" v-model="variant.UnitNumber" min="0"
@@ -260,10 +263,6 @@
                               textSearchUrl="/products/units/list" idSearchUrl="/products/units/" methode="GET"
                               :columns="[{ label: 'عنوان', key: 'title' }]"
                               :disabled="isView || !variant.convertUnit" />
-
-                            <span v-if="variant.selectConvertUnit">{{ variant.selectConvertUnit.title ||
-                              variant.selectConvertUnit
-                            }}</span>
 
                           </div>
                         </div>
@@ -326,7 +325,7 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { watch, nextTick } from 'vue'
 import Swal from 'sweetalert2'
 
 definePageMeta({
@@ -404,16 +403,17 @@ const selectedWarehouse = ref(null)
 const selectedMainCategory = ref(null)
 const selectedSubCategory = ref(null)
 const selectedSubSubCategory = ref(null)
+const isLoadingCategories = ref(false)
 
 
 
 watch(selectedMainCategory, (newCategory, oldCategory) => {
-  if (!newCategory) return
+  if (!newCategory || isLoadingCategories.value) return
   selectedSubCategory.value = null
   selectedSubSubCategory.value = null
 })
 watch(selectedSubCategory, (newCategory, oldCategory) => {
-  if (!newCategory) return
+  if (!newCategory || isLoadingCategories.value) return
   selectedSubSubCategory.value = null
 })
 // watch(selectedSubSubCategory, (newCategory, oldCategory) => {
@@ -426,6 +426,7 @@ watch(selectedSubCategory, (newCategory, oldCategory) => {
 // توابع مدیریت تنوع‌های محصول
 const addVariant = () => {
   productVariants.value.push({
+    id: '',
     name: '',
     firstWarehouse: 0,
     firstPrice: 0,
@@ -434,7 +435,8 @@ const addVariant = () => {
     status: 1,
     convertUnit: false,
     UnitNumber: 0,
-    selectConvertUnit: null
+    selectConvertUnit: null,
+    convert_unit_relation: null
   })
 }
 
@@ -486,14 +488,16 @@ const loadProduct = async () => {
         current_stock: variant.current_stock || 0,
         sell_price: parseFloat(variant.sell_price) || 0,
         status: variant.status ?? 1,
-        // فیلدهای اضافی که در دیتابیس نیستند، مقدار پیش‌فرض می‌دهیم
-        convertUnit: false,
-        UnitNumber: 0,
-        selectConvertUnit: null
+        // بارگذاری فیلدهای تبدیل واحد از دیتابیس
+        convertUnit: variant.convertUnit || false,
+        UnitNumber: variant.UnitNumber || 0,
+        selectConvertUnit: variant.selectConvertUnit || null,
+        convert_unit_relation: variant.convert_unit_relation
       }))
     } else {
       // اگر تنوع وجود ندارد، یک تنوع خالی ایجاد کن
       productVariants.value = [{
+        id: '',
         name: '',
         firstWarehouse: 0,
         firstPrice: 0,
@@ -502,53 +506,56 @@ const loadProduct = async () => {
         status: 1,
         convertUnit: false,
         UnitNumber: 0,
-        selectConvertUnit: null
+        selectConvertUnit: null,
+        convert_unit_relation: null
       }]
     }
 
     // بارگذاری تصاویر
     if (data.album) {
       const album = typeof data.album === 'string' ? JSON.parse(data.album) : data.album
-      if (album.thumbs && Array.isArray(album.thumbs)) {
-        productImages.value = album.thumbs.map((thumb, index) => ({
-          thumb: thumb,
-          url: album.base && album.base[index] ? album.base[index] : thumb,
+
+      if (Array.isArray(album)) {
+        productImages.value = album.map(img => ({
+          thumb: img.thumb || img.url,
+          url: img.url,
           removed: false
         }))
-      } else if (album.thumbs) {
-        productImages.value = [{
-          thumb: album.thumbs,
-          url: album.base || album.thumbs,
-          removed: false
-        }]
       }
     }
 
     // بارگذاری دسته‌بندی‌های انتخاب شده
     if (data.categores && Array.isArray(data.categores) && data.categores.length > 0) {
-      // تنظیم دسته‌بندی‌ها بر اساس سلسله مراتب
+      // جلوگیری از پاک شدن زیردسته‌ها توسط watcher ها
+      isLoadingCategories.value = true
+
       const categories = data.categores
 
-      // مرتب‌سازی بر اساس سطح (فرض می‌کنیم father برای تعیین سطح استفاده می‌شود)
-      categories.sort((a, b) => (a.father || 0) - (b.father || 0))
+      // مرتب‌سازی بر اساس سطح (f_id = 0 یعنی دسته اصلی)
+      categories.sort((a, b) => (a.f_id || 0) - (b.f_id || 0))
 
-      // تنظیم دسته‌بندی اصلی (اولین دسته‌بندی بدون father یا با father = null)
-      const mainCategory = categories.find(cat => !cat.father) || categories[0]
+      // تنظیم دسته‌بندی اصلی (f_id = 0 یا null یعنی بدون والد)
+      const mainCategory = categories.find(cat => !cat.f_id) || categories[0]
       if (mainCategory) {
         selectedMainCategory.value = mainCategory
       }
 
       // تنظیم دسته‌بندی فرزند
-      const subCategory = categories.find(cat => cat.father === mainCategory?.id)
+      const subCategory = categories.find(cat => cat.f_id === mainCategory?.id)
       if (subCategory) {
         selectedSubCategory.value = subCategory
 
         // تنظیم دسته‌بندی فرزند دوم
-        const subSubCategory = categories.find(cat => cat.father === subCategory.id)
+        const subSubCategory = categories.find(cat => cat.f_id === subCategory.id)
         if (subSubCategory) {
           selectedSubSubCategory.value = subSubCategory
         }
       }
+
+      // بعد از ست شدن همه مقادیر، flag رو غیرفعال کن
+      nextTick(() => {
+        isLoadingCategories.value = false
+      })
     }
 
     // تنظیم واحد، برند و انبار از روابط مستقیم
@@ -645,19 +652,24 @@ const appendProductFields = (formData, product, editorContent) => {
 
   // ارسال تنوع‌ها به صورت آرایه
   productVariants.value.forEach((variant, index) => {
-    // اگر نام تنوع خالی باشد، از عنوان اصلی محصول استفاده کن
     const variantName = variant.name?.trim() || product.title?.trim() || ''
+    // ارسال id برای تنوع‌های موجود (جهت آپدیت بجای حذف و ساخت مجدد)
+    if (variant.id) {
+      formData.append(`variants[${index}][id]`, variant.id)
+    }
     formData.append(`variants[${index}][title]`, variantName)
     formData.append(`variants[${index}][firstWarehouse]`, variant.firstWarehouse || 0)
     formData.append(`variants[${index}][firstPrice]`, variant.firstPrice || 0)
     formData.append(`variants[${index}][current_stock]`, variant.current_stock || 0)
     formData.append(`variants[${index}][sell_price]`, variant.sell_price || 0)
     formData.append(`variants[${index}][status]`, variant.status ?? 1)
-
-    // فیلدهای اضافی که در دیتابیس نیستند - فعلاً ارسال نکن
-    // formData.append(`variants[${index}][convertUnit]`, variant.convertUnit ? 1 : 0)
-    // formData.append(`variants[${index}][UnitNumber]`, variant.UnitNumber || 0)
-    // formData.append(`variants[${index}][selectConvertUnit]`, variant.selectConvertUnit?.id || 0)
+    formData.append(`variants[${index}][convertUnit]`, variant.convertUnit ? 1 : 0)
+    formData.append(`variants[${index}][UnitNumber]`, variant.UnitNumber || 0)
+    if (variant.selectConvertUnit && variant.selectConvertUnit.id) {
+      formData.append(`variants[${index}][selectConvertUnit]`, variant.selectConvertUnit.id)
+    } else if (variant.selectConvertUnit) {
+      formData.append(`variants[${index}][selectConvertUnit]`, variant.selectConvertUnit)
+    }
   })
 
   Object.entries(fieldMap).forEach(([key, value]) => {
@@ -666,43 +678,29 @@ const appendProductFields = (formData, product, editorContent) => {
     }
   })
 
-  // Add unit, brand, warehouse if selected
-  if (selectedUnit.value && selectedUnit.value.id) {
-    formData.append('Unit', selectedUnit.value.id)
-  }
-  if (selectedBrand.value && selectedBrand.value.id) {
-    formData.append('Brand', selectedBrand.value.id)
-  }
-  if (selectedWarehouse.value && selectedWarehouse.value.id) {
-    formData.append('Warehouse', selectedWarehouse.value.id)
-  }
-
   // Add form if exists
   if (product.form) {
     formData.append('form', JSON.stringify(product.form))
   }
 }
 
-// Helper function to build album payload
+// ساخت payload آلبوم برای ارسال به سرور
 const buildAlbumPayload = (images) => {
   if (!images.length) return null
 
   const album = {
     existing: [],
-    new: [],
     removed: []
   }
 
-  images.forEach((img, index) => {
+  images.forEach(img => {
     if (img.removed) {
-      album.removed.push({ index, id: img.id || img.url })
-    } else if (img.file) {
-      // New file - will be sent separately
-      album.new.push({ index, filename: img.file.name })
-    } else {
-      // Existing image - keep reference
+      album.removed.push({
+        url: img.url,
+        filename: img.url ? img.url.split('/').pop() : ''
+      })
+    } else if (!img.file) {
       album.existing.push({
-        index,
         url: img.url,
         thumb: img.thumb
       })
@@ -713,7 +711,7 @@ const buildAlbumPayload = (images) => {
 }
 
 // ذخیره محصول
-const saveProduct = async (e) => {
+const saveProduct = async (action) => {
   if (!product.value.title?.trim()) {
     formError.value = 'عنوان محصول الزامی است'
     return
@@ -874,11 +872,8 @@ const restoreProduct = async () => {
   if (result.isConfirmed) {
     formloading.value = true
     try {
-      // اگر endpoint restore در backend وجود دارد، از آن استفاده کنید
-      // در غیر این صورت، می‌توانید status را تغییر دهید
-      await $api(`/products/${productId.value}`, {
-        method: 'PUT',
-        body: { status: 1 }
+      await $api(`/products/${productId.value}/restore`, {
+        method: 'PATCH'
       })
 
       await Swal.fire({
@@ -921,9 +916,7 @@ const forceDeleteProduct = async () => {
   if (result.isConfirmed) {
     formloading.value = true
     try {
-      // اگر endpoint force delete در backend وجود دارد، از آن استفاده کنید
-      // در غیر این صورت، از همان DELETE استفاده می‌شود
-      await $api(`/products/${productId.value}`, {
+      await $api(`/products/${productId.value}/force`, {
         method: 'DELETE'
       })
 
