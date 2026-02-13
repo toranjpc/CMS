@@ -17,6 +17,7 @@ class Transaction extends Model
         'transaction_number',
         'party_id',
         'beneficiary_party_id',
+        'transfer_group_id',
         'amount',
         'payment_method',
         'invoice_id',

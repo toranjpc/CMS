@@ -83,18 +83,18 @@ class UserSeeder extends Seeder
                     'kind' => 'UserCategory',
                 ],
                 [
-                    'status' => 1,
+                'status' => 1,
                 ]
             );
 
             ExtData::firstOrCreate(
-                [
+            [
                     'f_id' => $customer->id,
                     'm_id' => $goldPlan->id,
                     'kind' => 'UserPlan',
-                ],
-                [
-                    'status' => 1,
+            ],
+            [
+                'status' => 1,
                 ]
             );
         });

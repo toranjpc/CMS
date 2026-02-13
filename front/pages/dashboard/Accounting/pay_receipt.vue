@@ -44,9 +44,10 @@
               :disabled="isViewingFromList ? 1 : 0" />
           </div>
 
+          <!-- Use shared TransactionWidget for common fields -->
           <div class="col-md-3">
             <label class="form-label">روش تسويه</label>
-            <select class="form-select" v-model="paymentMethod" :disabled="isViewingFromList">
+            <select class="form-select" v-model="transactionForm.payment_method" :disabled="isViewingFromList">
               <option value="cash">نقدي</option>
               <option value="card">کارت‌خوان</option>
               <option value="bank">بانکي</option>
@@ -55,11 +56,11 @@
             </select>
           </div>
 
-          <div class="col-md-3" v-if="paymentMethod === 'account_to_account'">
+          <div class="col-md-3" v-if="transactionForm.payment_method === 'account_to_account'">
             <label class="form-label">ذی‌نفع (شخص ثالث)</label>
             <widgets.searchinput
               placeholder="انتخاب ذی‌نفع"
-              v-model="beneficiaryParty"
+              v-model="transactionForm.beneficiary_party"
               textSearchUrl="/users/list"
               idSearchUrl="/users/"
               methode="GET"
@@ -73,7 +74,7 @@
 
           <div class="col-md-2">
             <label class="form-label">مبلغ</label>
-            <widgets.CurrencyInput v-model="amount" :readonly="isViewingFromList" inputClass="form-control" />
+            <widgets.CurrencyInput v-model="transactionForm.amount" :readonly="isViewingFromList" inputClass="form-control" />
           </div>
 
           <div class="col-md-4">
@@ -105,15 +106,18 @@
 
           <div class="col-12">
             <label class="form-label">شرح</label>
-            <textarea class="form-control" rows="3" v-model="description" :readonly="isViewingFromList" placeholder="مثال: دريافت از مشتري و واريز به صندوق"></textarea>
+            <textarea class="form-control" rows="3" v-model="transactionForm.description" :readonly="isViewingFromList" placeholder="مثال: دريافت از مشتري و واريز به صندوق"></textarea>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="d-flex justify-content-end">
+    <div class="d-flex justify-content-end gap-2">
       <button v-if="!isViewingFromList" class="btn btn-success px-4" :disabled="loading" @click="submit">
         {{ loading ? 'در حال پردازش...' : submitButtonText }}
+      </button>
+      <button v-if="!isViewingFromList" class="btn btn-outline-secondary px-4" :disabled="loading" @click="startNewTransaction">
+        سند جدید
       </button>
     </div>
   </div>
@@ -142,10 +146,13 @@ const transactionDate = ref(new Date().toISOString().split('T')[0])
 const transactionNumber = ref('')
 
 const party = ref(null)
-const beneficiaryParty = ref(null)
-const paymentMethod = ref('cash')
-const amount = ref(0)
-const description = ref('')
+const transactionForm = ref({
+  amount: 0,
+  payment_method: 'cash',
+  beneficiary_party: null,
+  transaction_date: new Date().toISOString().split('T')[0],
+  description: ''
+})
 
 const invoiceNumber = ref('')
 const linkedInvoice = ref(null)
@@ -178,6 +185,8 @@ const toNumber = value => {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
 }
+
+const normalizeBeneficiary = (tr) => tr?.beneficiaryParty || tr?.beneficiary_party || null
 
 const format = v => new Intl.NumberFormat('fa-IR').format(toNumber(v))
 
@@ -234,10 +243,14 @@ const loadExistingTransaction = async () => {
       transactionType.value = tr.type
       transactionDate.value = tr.transaction_date
       party.value = tr.party
-      paymentMethod.value = tr.payment_method
-      beneficiaryParty.value = tr.beneficiaryParty || null
-      amount.value = toNumber(tr.amount)
-      description.value = tr.description || ''
+      transactionForm.value = {
+        amount: toNumber(tr.amount),
+        payment_method: tr.payment_method || 'cash',
+        beneficiary_party: normalizeBeneficiary(tr),
+        transaction_date: tr.transaction_date || transactionDate.value,
+        description: tr.description || ''
+      }
+      transactionDate.value = transactionForm.value.transaction_date
       invoiceNumber.value = tr.invoice?.invoice_number || ''
       linkedInvoice.value = tr.invoice || null
     }
@@ -262,7 +275,7 @@ const validateForm = async () => {
     return false
   }
 
-  if (toNumber(amount.value) <= 0) {
+  if (toNumber(transactionForm.value.amount) <= 0) {
     await Swal.fire({
       icon: 'warning',
       title: 'اطلاعات ناقص',
@@ -271,8 +284,8 @@ const validateForm = async () => {
     return false
   }
 
-  if (paymentMethod.value === 'account_to_account') {
-    if (!beneficiaryParty.value || !beneficiaryParty.value.id) {
+  if (transactionForm.value.payment_method === 'account_to_account') {
+    if (!transactionForm.value.beneficiary_party || !transactionForm.value.beneficiary_party.id) {
       await Swal.fire({
         icon: 'warning',
         title: 'اطلاعات ناقص',
@@ -281,7 +294,7 @@ const validateForm = async () => {
       return false
     }
 
-    if (beneficiaryParty.value.id === party.value.id) {
+    if (transactionForm.value.beneficiary_party.id === party.value.id) {
       await Swal.fire({
         icon: 'warning',
         title: 'اطلاعات نادرست',
@@ -298,16 +311,24 @@ const validateForm = async () => {
 
   if (linkedInvoice.value) {
     const expectedType = linkedInvoice.value.type === 'sell' ? 'receive' : 'payment'
-    if (transactionType.value !== expectedType) {
+    const isPrimarySide =
+      transactionType.value === expectedType &&
+      linkedInvoice.value.party_id === party.value.id
+    const isTransferCounterSide =
+      paymentMethod.value === 'account_to_account' &&
+      Boolean(loadedTransaction.value?.transfer_group_id) &&
+      transactionType.value !== expectedType
+
+    if (!isPrimarySide && !isTransferCounterSide) {
       await Swal.fire({
         icon: 'warning',
         title: 'عدم تطابق نوع',
-        text: 'نوع سند با نوع فاکتور انتخابي همخواني ندارد.'
+        text: 'اطلاعات سند با فاکتور انتخابي همخواني ندارد.'
       })
       return false
     }
 
-    if (linkedInvoice.value.party_id !== party.value.id) {
+    if (!isTransferCounterSide && linkedInvoice.value.party_id !== party.value.id) {
       await Swal.fire({
         icon: 'warning',
         title: 'عدم تطابق طرف حساب',
@@ -323,14 +344,21 @@ const validateForm = async () => {
 const resetForm = async () => {
   loadedTransaction.value = null
   party.value = null
-  paymentMethod.value = 'cash'
-  beneficiaryParty.value = null
-  amount.value = 0
-  description.value = ''
+  transactionForm.value = {
+    amount: 0,
+    payment_method: 'cash',
+    beneficiary_party: null,
+    transaction_date: new Date().toISOString().split('T')[0],
+    description: ''
+  }
   invoiceNumber.value = ''
   linkedInvoice.value = null
   transactionDate.value = new Date().toISOString().split('T')[0]
   await loadNextNumber()
+}
+
+const startNewTransaction = async () => {
+  await resetForm()
 }
 
 const submit = async () => {
@@ -342,12 +370,12 @@ const submit = async () => {
     const payload = {
       type: transactionType.value,
       party_id: party.value.id,
-      amount: toNumber(amount.value),
-      payment_method: paymentMethod.value,
-      beneficiary_party_id: beneficiaryParty.value?.id || null,
+      amount: toNumber(transactionForm.value.amount),
+      payment_method: transactionForm.value.payment_method,
+      beneficiary_party_id: transactionForm.value.beneficiary_party?.id || null,
       invoice_id: linkedInvoice.value?.id || null,
-      transaction_date: transactionDate.value,
-      description: description.value || null
+      transaction_date: transactionForm.value.transaction_date,
+      description: transactionForm.value.description || null
     }
 
     const isEditing = Boolean(loadedTransaction.value?.id)
@@ -358,12 +386,16 @@ const submit = async () => {
       await loadExistingTransaction()
     } else {
       response = await $api('/transactions', { method: 'POST', body: payload })
-      await resetForm()
+      const created = response?.data || null
+      if (created?.transaction_number) {
+        transactionNumber.value = created.transaction_number
+        await loadExistingTransaction()
+      }
     }
 
     // برای account_to_account، پیام خاص نمایش می‌دهیم
     let successMessage = isEditing ? 'سند با موفقيت ويرايش شد' : 'سند با موفقيت ثبت شد'
-    if (paymentMethod.value === 'account_to_account') {
+    if (transactionForm.value.payment_method === 'account_to_account') {
       successMessage = isEditing ? 'دو سند حساب به حساب با موفقيت ويرايش شدند' : 'دو سند حساب به حساب با موفقيت ثبت شدند'
     }
 

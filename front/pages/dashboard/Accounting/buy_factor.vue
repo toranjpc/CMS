@@ -211,46 +211,7 @@
         </div>
 
         <div v-if="showTransactionForm">
-          <div class="mb-2">
-            <label class="form-label">مبلغ سند</label>
-            <widgets.CurrencyInput v-model="transactionForm.amount" inputClass="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label">روش پرداخت</label>
-            <select class="form-select" v-model="transactionForm.payment_method">
-              <option value="cash">نقدی</option>
-              <option value="card">کارت‌خوان</option>
-              <option value="bank">بانکی</option>
-              <option value="cheque">چک</option>
-              <option value="account_to_account">حساب به حساب</option>
-            </select>
-          </div>
-
-          <div class="mb-2" v-if="transactionForm.payment_method === 'account_to_account'">
-            <label class="form-label">ذی‌نفع (شخص ثالث)</label>
-            <widgets.searchinput
-              placeholder="انتخاب ذی‌نفع"
-              v-model="transactionForm.beneficiary_party"
-              textSearchUrl="/users/list"
-              idSearchUrl="/users/"
-              methode="GET"
-              :columns="[
-                { label: 'نام', key: 'name' },
-                { label: 'نام خانوادگی', key: 'lastname' },
-                { label: 'موبایل', key: 'mobile' }
-              ]" />
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label">تاریخ سند</label>
-            <dateFild v-model="transactionForm.transaction_date" />
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">شرح</label>
-            <textarea rows="2" class="form-control" v-model="transactionForm.description" />
-          </div>
+          <widgets.TransactionWidget v-model="transactionForm" />
 
           <div class="d-flex gap-2">
             <button class="btn btn-success flex-grow-1" :disabled="transactionLoading" @click="submitTransaction">

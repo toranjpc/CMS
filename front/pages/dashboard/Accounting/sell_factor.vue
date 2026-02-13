@@ -43,7 +43,8 @@
 
         <div class="mt-2">
           <label class="form-label">شماره فاکتور</label>
-          <input type="text" class="form-control" v-model="invoiceNumber" @input="loadExistingInvoice" :readonly="hasRouteInvoice" />
+          <input type="text" class="form-control" v-model="invoiceNumber" @input="loadExistingInvoice"
+            :readonly="hasRouteInvoice" />
         </div>
       </div>
     </div>
@@ -65,12 +66,14 @@
 
           <div class="col-md-2">
             <label class="form-label">تعداد</label>
-            <input type="number" min="1" v-model.number="newItem.quantity" class="form-control" :readonly="isViewingFromList" />
+            <input type="number" min="1" v-model.number="newItem.quantity" class="form-control"
+              :readonly="isViewingFromList" />
           </div>
 
           <div class="col-md-3">
             <label class="form-label">قیمت واحد</label>
-            <widgets.CurrencyInput v-model="newItem.unitPrice" :readonly="isViewingFromList" inputClass="form-control" />
+            <widgets.CurrencyInput v-model="newItem.unitPrice" :readonly="isViewingFromList"
+              inputClass="form-control" />
           </div>
 
           <div class="col-md-1">
@@ -101,17 +104,17 @@
 
             <template v-for="(item, i) in items" :key="i">
               <tr>
-              <td>{{ i + 1 }}</td>
-              <td>{{ item.title }}</td>
-              <td>{{ item.quantity }}</td>
-              <td>{{ format(item.unit_price) }}</td>
-              <td>{{ format(item.subtotal) }}</td>
-              <td>
-                <button class="btn btn-sm btn-danger" @click="removeItem(i)" :disabled="isViewingFromList">
-                  حذف
-                </button>
-              </td>
-            </tr>
+                <td>{{ i + 1 }}</td>
+                <td>{{ item.title }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ format(item.unit_price) }}</td>
+                <td>{{ format(item.subtotal) }}</td>
+                <td>
+                  <button class="btn btn-sm btn-danger" @click="removeItem(i)" :disabled="isViewingFromList">
+                    حذف
+                  </button>
+                </td>
+              </tr>
               <tr v-if="itemValidationErrors[i]">
                 <td colspan="6" class="text-danger small py-1">
                   {{ itemValidationErrors[i] }}
@@ -139,7 +142,8 @@
 
             <div class="d-flex justify-content-between align-items-center mt-2">
               <span>تخفیف کل:</span>
-              <input type="number" class="form-control form-control-sm w-50" v-model.number="invoiceDiscount" @input="calculateTotals" :readonly="isViewingFromList" />
+              <input type="number" class="form-control form-control-sm w-50" v-model.number="invoiceDiscount"
+                @input="calculateTotals" :readonly="isViewingFromList" />
             </div>
 
             <div class="d-flex justify-content-between mt-2">
@@ -158,15 +162,13 @@
               <button v-if="!isViewingFromList" class="btn btn-success w-100" :disabled="loading" @click="submit">
                 {{ loading ? 'در حال پردازش...' : submitButtonText }}
               </button>
-              <button v-if="!isViewingFromList" class="btn btn-outline-secondary" :disabled="loading" @click="startNewInvoice">
+              <button v-if="!isViewingFromList" class="btn btn-outline-secondary" :disabled="loading"
+                @click="startNewInvoice">
                 فاکتور جدید
               </button>
             </div>
-            <button
-              v-if="loadedInvoice?.id && !isViewingFromList"
-              class="btn btn-outline-primary w-100 mt-2"
-              :disabled="transactionLookupLoading"
-              @click="openTransactionWidgetForInvoice(loadedInvoice)">
+            <button v-if="loadedInvoice?.id && !isViewingFromList" class="btn btn-outline-primary w-100 mt-2"
+              :disabled="transactionLookupLoading" @click="openTransactionWidgetForInvoice(loadedInvoice)">
               {{ transactionLookupLoading ? 'در حال دریافت اسناد...' : transactionTitle }}
             </button>
           </div>
@@ -195,15 +197,11 @@
           </div>
 
           <div v-if="transactionListLoading" class="text-muted small">در حال بارگذاری اسناد...</div>
-          <div v-else-if="transactionList.length === 0" class="text-muted small">برای این فاکتور هنوز سندی ثبت نشده است.</div>
+          <div v-else-if="transactionList.length === 0" class="text-muted small">برای این فاکتور هنوز سندی ثبت نشده است.
+          </div>
           <div v-else class="transaction-list">
-            <button
-              v-for="tr in transactionList"
-              :key="tr.id"
-              type="button"
-              class="transaction-list-item"
-              :class="{ active: currentTransaction?.id === tr.id }"
-              @click="selectTransactionForEdit(tr)">
+            <button v-for="tr in transactionList" :key="tr.id" type="button" class="transaction-list-item"
+              :class="{ active: currentTransaction?.id === tr.id }" @click="selectTransactionForEdit(tr)">
               <span>{{ tr.transaction_number }}</span>
               <span>{{ format(tr.amount) }}</span>
             </button>
@@ -211,52 +209,14 @@
         </div>
 
         <div v-if="showTransactionForm">
-          <div class="mb-2">
-            <label class="form-label">مبلغ سند</label>
-            <widgets.CurrencyInput v-model="transactionForm.amount" inputClass="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label">روش پرداخت</label>
-            <select class="form-select" v-model="transactionForm.payment_method">
-              <option value="cash">نقدی</option>
-              <option value="card">کارت‌خوان</option>
-              <option value="bank">بانکی</option>
-              <option value="cheque">چک</option>
-              <option value="account_to_account">حساب به حساب</option>
-            </select>
-          </div>
-
-          <div class="mb-2" v-if="transactionForm.payment_method === 'account_to_account'">
-            <label class="form-label">ذی‌نفع (شخص ثالث)</label>
-            <widgets.searchinput
-              placeholder="انتخاب ذی‌نفع"
-              v-model="transactionForm.beneficiary_party"
-              textSearchUrl="/users/list"
-              idSearchUrl="/users/"
-              methode="GET"
-              :columns="[
-                { label: 'نام', key: 'name' },
-                { label: 'نام خانوادگی', key: 'lastname' },
-                { label: 'موبایل', key: 'mobile' }
-              ]" />
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label">تاریخ سند</label>
-            <dateFild v-model="transactionForm.transaction_date" />
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">شرح</label>
-            <textarea rows="2" class="form-control" v-model="transactionForm.description" />
-          </div>
+          <widgets.TransactionWidget v-model="transactionForm" />
 
           <div class="d-flex gap-2">
             <button class="btn btn-success flex-grow-1" :disabled="transactionLoading" @click="submitTransaction">
               {{ transactionLoading ? 'در حال ثبت...' : transactionSubmitText }}
             </button>
-            <button class="btn btn-outline-secondary" :disabled="transactionLoading" @click="showTransactionForm = false">
+            <button class="btn btn-outline-secondary" :disabled="transactionLoading"
+              @click="showTransactionForm = false">
               انصراف
             </button>
           </div>
@@ -439,15 +399,15 @@ const addItem = () => {
       subtotal: mergedSubtotal
     }
   } else {
-  items.value.push({
-    product_item_id: product.value.id, // استفاده از product_item_id
-    warehouse_id: warehouse.value.id,
-    product_id: productId, // استفاده از product_id والد
-    title: product.value.display_name,
-    quantity: newItem.value.quantity,
-    unit_price: newItem.value.unitPrice,
-    subtotal: newItem.value.subtotal
-  })
+    items.value.push({
+      product_item_id: product.value.id, // استفاده از product_item_id
+      warehouse_id: warehouse.value.id,
+      product_id: productId, // استفاده از product_id والد
+      title: product.value.display_name,
+      quantity: newItem.value.quantity,
+      unit_price: newItem.value.unitPrice,
+      subtotal: newItem.value.subtotal
+    })
   }
 
   product.value = null
