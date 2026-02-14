@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پنل ادمین - دسکتاپ</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="fonts/webfonts/css/all.min.css">
+</head>
+<body>
+    <!-- Desktop Background -->
+    <div class="desktop">
+        <!-- Desktop Icons -->
+        <div class="desktop-icons">
+            <div class="desktop-icon" data-app="dashboard">
+                <div class="icon-image">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <span class="icon-label">داشبورد</span>
+            </div>
+            
+            <div class="desktop-icon" data-app="users">
+                <div class="icon-image">
+                    <i class="fas fa-users"></i>
+                </div>
+                <span class="icon-label">کاربران</span>
+            </div>
+            
+            <div class="desktop-icon" data-app="settings">
+                <div class="icon-image">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <span class="icon-label">تنظیمات</span>
+            </div>
+            
+            <div class="desktop-icon" data-app="reports">
+                <div class="icon-image">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <span class="icon-label">گزارشات</span>
+            </div>
+            
+            <div class="desktop-icon" data-app="analytics">
+                <div class="icon-image">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <span class="icon-label">تحلیل‌ها</span>
+            </div>
+            
+            <div class="desktop-icon" data-app="files">
+                <div class="icon-image">
+                    <i class="fas fa-folder"></i>
+                </div>
+                <span class="icon-label">فایل‌ها</span>
+            </div>
+            
+            <div class="desktop-icon" data-app="notifications">
+                <div class="icon-image">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <span class="icon-label">اعلان‌ها</span>
+            </div>
+            
+            <div class="desktop-icon" data-app="logs">
+                <div class="icon-image">
+                    <i class="fas fa-list-alt"></i>
+                </div>
+                <span class="icon-label">لاگ‌ها</span>
+            </div>
+        </div>
+
+        <!-- Application Windows -->
+        <div class="windows-container"></div>
+    </div>
+
+    <!-- Taskbar -->
+    <div class="taskbar">
+        <div class="taskbar-left">
+            <button class="start-button" id="startBtn">
+                <i class="fab fa-windows"></i>
+            </button>
+            <div class="taskbar-apps" id="taskbarApps"></div>
+        </div>
+        
+        <div class="taskbar-right">
+            <div class="system-tray">
+                <div class="tray-icon" id="wifiIcon">
+                    <i class="fas fa-wifi"></i>
+                </div>
+                <div class="tray-icon" id="soundIcon">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+                <div class="tray-icon" id="batteryIcon">
+                    <i class="fas fa-battery-three-quarters"></i>
+                </div>
+                <div class="datetime" id="datetime">
+                    <span class="time">--:--</span>
+                    <span class="date">--/--/----</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Menu -->
+    <div class="start-menu" id="startMenu">
+        <div class="start-menu-header">
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-details">
+                    <div class="user-name">مدیر سیستم</div>
+                    <div class="user-role">Administrator</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="start-menu-content">
+            <div class="start-menu-apps">
+                <div class="app-tile" data-app="dashboard">
+                    <i class="fas fa-chart-line"></i>
+                    <span>داشبورد</span>
+                </div>
+                <div class="app-tile" data-app="users">
+                    <i class="fas fa-users"></i>
+                    <span>کاربران</span>
+                </div>
+                <div class="app-tile" data-app="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>تنظیمات</span>
+                </div>
+                <div class="app-tile" data-app="reports">
+                    <i class="fas fa-file-alt"></i>
+                    <span>گزارشات</span>
+                </div>
+                <div class="app-tile" data-app="analytics">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>تحلیل‌ها</span>
+                </div>
+                <div class="app-tile" data-app="files">
+                    <i class="fas fa-folder"></i>
+                    <span>فایل‌ها</span>
+                </div>
+                <div class="app-tile" data-app="notifications">
+                    <i class="fas fa-bell"></i>
+                    <span>اعلان‌ها</span>
+                </div>
+                <div class="app-tile" data-app="logs">
+                    <i class="fas fa-list-alt"></i>
+                    <span>لاگ‌ها</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="start-menu-footer">
+            <button class="power-button">
+                <i class="fas fa-power-off"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" data-action="open">
+            <i class="fas fa-folder-open"></i>
+            <span>باز کردن</span>
+        </div>
+        <div class="context-menu-item" data-action="rename">
+            <i class="fas fa-edit"></i>
+            <span>تغییر نام</span>
+        </div>
+        <div class="context-menu-item" data-action="delete">
+            <i class="fas fa-trash"></i>
+            <span>حذف</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" data-action="properties">
+            <i class="fas fa-info-circle"></i>
+            <span>خصوصیات</span>
+        </div>
+    </div>
+
+    <script src="js/scripts.js"></script>
+</body>
+</html>
