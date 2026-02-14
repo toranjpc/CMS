@@ -45,15 +45,23 @@
               <button class="window-control minimize" @click="minimizeWindow(window.id)" title="کوچک کردن">
                 <i class="fas fa-minus"></i>
               </button>
-              <button class="window-control maximize" @click="maximizeWindow(window.id)" title="بزرگ کردن">
-                <i class="fas fa-square"></i>
+              <button class="window-control maximize" @click="maximizeWindow(window.id)" :title="window.maximized ? 'بازگرداندن' : 'بزرگ کردن'">
+                <i :class="window.maximized ? 'fas fa-window-restore' : 'fas fa-square'"></i>
               </button>
               <button class="window-control close" @click="closeWindow(window.id)" title="بستن">
                 <i class="fas fa-times"></i>
               </button>
             </div>
           </div>
-          <div class="window-content" v-if="!window.minimized" v-html="window.content"></div>
+          <div class="window-content" v-show="!window.minimized">
+            <iframe 
+              v-if="window.route" 
+              :src="window.route" 
+              frameborder="0"
+              style="width: 100%; height: 100%; border: none;"
+            ></iframe>
+            <div v-else-if="window.content" v-html="window.content"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -73,7 +81,10 @@
             v-for="window in openWindows"
             :key="window.id"
             class="taskbar-app"
-            :class="{ active: window.zIndex === windowZIndex }"
+            :class="{ 
+              active: window.zIndex === windowZIndex && !window.minimized,
+              minimized: window.minimized
+            }"
             @click="focusWindow(window.id)"
           >
             <i :class="window.icon"></i>
@@ -116,16 +127,25 @@
       </div>
       
       <div class="start-menu-content">
-        <div class="start-menu-apps">
-          <div
-            v-for="(app, appName) in windowsApps"
-            :key="appName"
-            class="app-tile"
-            :data-app="appName"
-            @click="openApp(appName)"
-          >
-            <i :class="app.icon"></i>
-            <span>{{ app.title }}</span>
+        <div class="start-menu-left">
+          <!-- Main menu items grouped by category -->
+          <div class="menu-section" v-for="(group, groupName) in groupedMenuItems" :key="groupName">
+            <div class="menu-section-header" v-if="groupName !== 'main'">
+              <i :class="getGroupIcon(groupName)"></i>
+              <span>{{ getGroupTitle(groupName) }}</span>
+            </div>
+            <div class="menu-section-items">
+              <div
+                v-for="(item, itemKey) in group"
+                :key="itemKey"
+                class="app-tile"
+                :data-app="itemKey"
+                @click="openApp(itemKey)"
+              >
+                <i :class="item.icon"></i>
+                <span>{{ item.title }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -194,6 +214,7 @@ const {
   selectedIcon,
   dateTime,
   apps: windowsApps,
+  menuItems,
   initializeDateTime,
   toggleStartMenu,
   closeStartMenu,
@@ -214,6 +235,57 @@ const desktopIconsRef = ref(null)
 // Icon positions
 const iconPositions = ref({})
 const iconDragging = ref({ appName: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0 })
+
+// Group menu items by parent
+const groupedMenuItems = computed(() => {
+  const groups = {
+    main: {},
+    users: {},
+    products: {},
+    accounting: {}
+  }
+  
+  Object.entries(menuItems).forEach(([key, item]) => {
+    if (!item.parent) {
+      groups.main[key] = item
+    } else if (item.parent === 'users') {
+      groups.users[key] = item
+    } else if (item.parent === 'products') {
+      groups.products[key] = item
+    } else if (item.parent === 'accounting') {
+      groups.accounting[key] = item
+    }
+  })
+  
+  // Remove empty groups
+  Object.keys(groups).forEach(key => {
+    if (Object.keys(groups[key]).length === 0) {
+      delete groups[key]
+    }
+  })
+  
+  return groups
+})
+
+// Get group icon
+const getGroupIcon = (groupName) => {
+  const icons = {
+    users: 'fa fa-users',
+    products: 'fa fa-tags',
+    accounting: 'fa fa-file'
+  }
+  return icons[groupName] || 'fa fa-folder'
+}
+
+// Get group title
+const getGroupTitle = (groupName) => {
+  const titles = {
+    users: 'کاربران',
+    products: 'محصولات',
+    accounting: 'عملیات حسابداری'
+  }
+  return titles[groupName] || groupName
+}
 
 // Calculate initial grid position for icons
 const getInitialIconPosition = (index) => {
@@ -335,18 +407,30 @@ const getWindowStyle = (window) => {
     zIndex: window.zIndex || 100
   }
   
-  if (window.maximized) {
+  if (window.minimized) {
+    // Hide minimized windows but keep them in DOM to preserve iframe state
+    style.visibility = 'hidden'
+    style.pointerEvents = 'none'
+    style.opacity = '0'
+    // Keep dimensions to prevent reflow
+    style.width = window.width ? `${window.width}px` : '1000px'
+    style.height = window.height ? `${window.height}px` : '700px'
+    if (window.x !== undefined) style.left = `${window.x}px`
+    if (window.y !== undefined) style.top = `${window.y}px`
+  } else if (window.maximized) {
     style.width = '100%'
     style.height = 'calc(100vh - 50px)'
     style.left = '0'
     style.top = '0'
-  } else if (!window.minimized) {
-    style.width = '800px'
-    style.height = '600px'
+    style.display = 'flex'
+    style.visibility = 'visible'
+  } else {
+    style.width = window.width ? `${window.width}px` : '1000px'
+    style.height = window.height ? `${window.height}px` : '700px'
     if (window.x !== undefined) style.left = `${window.x}px`
     if (window.y !== undefined) style.top = `${window.y}px`
-  } else {
-    style.display = 'none'
+    style.display = 'flex'
+    style.visibility = 'visible'
   }
   
   return style
@@ -462,5 +546,16 @@ definePageMeta({
 .windows-layout {
   height: 100vh;
   overflow: hidden;
+}
+
+.window-content {
+  overflow: hidden;
+}
+
+.window-content iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
 }
 </style>

@@ -5,7 +5,7 @@
 <script setup>
 definePageMeta({
     layout: 'windows',
-    // middleware: 'auth',
+    middleware: 'auth',
     title: 'داشبورد مدیریت'
 })
 const { $api } = useNuxtApp()

@@ -16,80 +16,142 @@ export const useWindows = () => {
   const selectedIcon = ref<string | null>(null)
   const dateTime = ref({ time: '--:--', date: '--/--/----' })
 
-  // Application data
+  // Menu items from dashboard sidebar
+  const menuItems = {
+    dashboard: {
+      title: 'داشبورد',
+      icon: 'fa fa-home',
+      route: '/dashboard',
+      type: 'page'
+    },
+    users_list: {
+      title: 'لیست کاربران',
+      icon: 'fa fa-users',
+      route: '/dashboard/users',
+      type: 'page',
+      parent: 'users'
+    },
+    users_categories: {
+      title: 'دسته‌بندی کاربران',
+      icon: 'fa fa-folder',
+      route: '/dashboard/users/categories',
+      type: 'page',
+      parent: 'users'
+    },
+    users_roles: {
+      title: 'نقش‌های کاربری',
+      icon: 'fa fa-user-shield',
+      route: '/dashboard/users/roles',
+      type: 'page',
+      parent: 'users'
+    },
+    users_plans: {
+      title: 'پل‌های کاربری',
+      icon: 'fa fa-list',
+      route: '/dashboard/users/plans',
+      type: 'page',
+      parent: 'users'
+    },
+    products_add: {
+      title: 'ایجاد محصول جدید',
+      icon: 'fa fa-plus',
+      route: '/dashboard/products/add',
+      type: 'page',
+      parent: 'products'
+    },
+    products_list: {
+      title: 'لیست محصولات',
+      icon: 'fa fa-tags',
+      route: '/dashboard/products',
+      type: 'page',
+      parent: 'products'
+    },
+    products_categories: {
+      title: 'دسته‌بندی ها',
+      icon: 'fa fa-folder-open',
+      route: '/dashboard/products/categories',
+      type: 'page',
+      parent: 'products'
+    },
+    products_features: {
+      title: 'ویژگی‌ها',
+      icon: 'fa fa-star',
+      route: '/dashboard/products/features',
+      type: 'page',
+      parent: 'products'
+    },
+    products_units: {
+      title: 'واحد های اندازه گیری',
+      icon: 'fa fa-ruler',
+      route: '/dashboard/products/units',
+      type: 'page',
+      parent: 'products'
+    },
+    products_brands: {
+      title: 'برندها',
+      icon: 'fa fa-certificate',
+      route: '/dashboard/products/brands',
+      type: 'page',
+      parent: 'products'
+    },
+    products_warehouses: {
+      title: 'انبار ها',
+      icon: 'fa fa-warehouse',
+      route: '/dashboard/products/warehouses',
+      type: 'page',
+      parent: 'products'
+    },
+    accounting_buy_factor: {
+      title: 'فاکتور خرید',
+      icon: 'fa fa-file-invoice',
+      route: '/dashboard/Accounting/buy_factor',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_buy_list: {
+      title: 'لیست فاکتورهای خرید',
+      icon: 'fa fa-list-alt',
+      route: '/dashboard/Accounting/buy_list',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_sell_factor: {
+      title: 'فاکتور فروش',
+      icon: 'fa fa-file-invoice-dollar',
+      route: '/dashboard/Accounting/sell_factor',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_sell_list: {
+      title: 'لیست فاکتورهای فروش',
+      icon: 'fa fa-list-check',
+      route: '/dashboard/Accounting/sell_list',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_pay_receipt: {
+      title: 'ثبت سند دریافت/پرداخت',
+      icon: 'fa fa-file-signature',
+      route: '/dashboard/Accounting/pay_receipt',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_pay_receipt_list: {
+      title: 'لیست اسناد دریافت/پرداخت',
+      icon: 'fa fa-file-lines',
+      route: '/dashboard/Accounting/pay_receipt_list',
+      type: 'page',
+      parent: 'accounting'
+    }
+  }
+
+  // Application data (for backward compatibility)
   const apps = {
     dashboard: {
       title: 'داشبورد',
       icon: 'fas fa-chart-line',
-      content: `
-        <h2>داشبورد مدیریتی</h2>
-        <div class="content-grid">
-          <div class="stat-card">
-            <h3>کاربران فعال</h3>
-            <div class="stat-value">1,234</div>
-            <div class="stat-change">↑ 12% نسبت به ماه قبل</div>
-          </div>
-          <div class="stat-card">
-            <h3>بازدید امروز</h3>
-            <div class="stat-value">5,678</div>
-            <div class="stat-change">↑ 8% نسبت به دیروز</div>
-          </div>
-          <div class="stat-card">
-            <h3>درآمد ماهانه</h3>
-            <div class="stat-value">12.5M</div>
-            <div class="stat-change">↑ 15% نسبت به ماه قبل</div>
-          </div>
-          <div class="stat-card">
-            <h3>سفارشات</h3>
-            <div class="stat-value">892</div>
-            <div class="stat-change">↑ 5% نسبت به ماه قبل</div>
-          </div>
-        </div>
-      `
-    },
-    users: {
-      title: 'مدیریت کاربران',
-      icon: 'fas fa-users',
-      content: `
-        <h2>مدیریت کاربران</h2>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>شناسه</th>
-                <th>نام کاربری</th>
-                <th>ایمیل</th>
-                <th>نقش</th>
-                <th>تاریخ عضویت</th>
-                <th>وضعیت</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>1</td>
-                <td>admin</td>
-                <td>admin@example.com</td>
-                <td>مدیر</td>
-                <td>1402/01/15</td>
-                <td>فعال</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      `
-    },
-    settings: {
-      title: 'تنظیمات سیستم',
-      icon: 'fas fa-cog',
-      content: `
-        <h2>تنظیمات سیستم</h2>
-        <div class="content-grid">
-          <div class="stat-card">
-            <h3>تنظیمات عمومی</h3>
-            <p>تنظیمات کلی سیستم و پیکربندی</p>
-          </div>
-        </div>
-      `
+      route: '/dashboard',
+      type: 'page'
     }
   }
 
@@ -119,7 +181,7 @@ export const useWindows = () => {
     startMenuActive.value = false
   }
 
-  // Open application
+  // Open application or page
   const openApp = (appName: string) => {
     const existingWindow = openWindows.value.find(w => w.appName === appName)
     if (existingWindow) {
@@ -127,9 +189,24 @@ export const useWindows = () => {
       return
     }
 
+    // Check menu items first
+    const menuItem = menuItems[appName as keyof typeof menuItems]
+    if (menuItem) {
+      openPage(menuItem.route, menuItem.title, menuItem.icon, appName)
+      return
+    }
+
+    // Fallback to apps
     const app = apps[appName as keyof typeof apps]
     if (!app) return
 
+    // If app has route, use openPage
+    if ((app as any).route) {
+      openPage((app as any).route, app.title, app.icon, appName)
+      return
+    }
+
+    // Otherwise use content (legacy apps)
     const windowId = `window-${Date.now()}`
     
     // Calculate center position
@@ -149,11 +226,55 @@ export const useWindows = () => {
       appName: appName,
       title: app.title,
       icon: app.icon,
-      content: app.content,
+      content: (app as any).content || '',
+      route: null,
       x: x,
       y: y,
       minimized: false,
       maximized: false,
+      zIndex: windowZIndex.value
+    }
+
+    openWindows.value.push(windowData)
+    closeStartMenu()
+    focusWindow(windowId)
+  }
+
+  // Open page in window
+  const openPage = (route: string, title: string, icon: string, appName: string) => {
+    const existingWindow = openWindows.value.find(w => w.route === route)
+    if (existingWindow) {
+      focusWindow(existingWindow.id)
+      return
+    }
+
+    const windowId = `window-${Date.now()}`
+    
+    // Calculate center position
+    let x = 100
+    let y = 100
+    if (typeof window !== 'undefined') {
+      const windowWidth = 1000
+      const windowHeight = 700
+      const desktopWidth = window.innerWidth
+      const desktopHeight = window.innerHeight - 50 // minus taskbar
+      x = Math.max(0, (desktopWidth - windowWidth) / 2)
+      y = Math.max(0, (desktopHeight - windowHeight) / 2)
+    }
+    
+    const windowData = {
+      id: windowId,
+      appName: appName,
+      title: title,
+      icon: icon,
+      route: route,
+      content: null,
+      x: x,
+      y: y,
+      width: 1000,
+      height: 700,
+      minimized: false,
+      maximized: true, // Default to maximized
       zIndex: windowZIndex.value
     }
 
@@ -167,6 +288,14 @@ export const useWindows = () => {
     windowZIndex.value++
     const window = openWindows.value.find(w => w.id === windowId)
     if (window) {
+      // If minimized, restore it to previous state
+      if (window.minimized) {
+        window.minimized = false
+        // Restore to maximized state if it was maximized before
+        if (window.wasMaximized) {
+          window.maximized = true
+        }
+      }
       window.zIndex = windowZIndex.value
     }
   }
@@ -183,7 +312,10 @@ export const useWindows = () => {
   const minimizeWindow = (windowId: string) => {
     const window = openWindows.value.find(w => w.id === windowId)
     if (window) {
-      window.minimized = !window.minimized
+      // Save the maximized state before minimizing
+      window.wasMaximized = window.maximized
+      window.minimized = true
+      // Don't change maximized state - keep it as is
     }
   }
 
@@ -191,7 +323,37 @@ export const useWindows = () => {
   const maximizeWindow = (windowId: string) => {
     const window = openWindows.value.find(w => w.id === windowId)
     if (window) {
-      window.maximized = !window.maximized
+      if (window.maximized) {
+        // Restore: use saved dimensions or default
+        window.maximized = false
+        if (window.restoredWidth) {
+          window.width = window.restoredWidth
+        } else {
+          window.width = 1000
+        }
+        if (window.restoredHeight) {
+          window.height = window.restoredHeight
+        } else {
+          window.height = 700
+        }
+        if (window.restoredX !== undefined) {
+          window.x = window.restoredX
+        } else {
+          window.x = 100
+        }
+        if (window.restoredY !== undefined) {
+          window.y = window.restoredY
+        } else {
+          window.y = 100
+        }
+      } else {
+        // Maximize: save current dimensions
+        window.restoredWidth = window.width || 1000
+        window.restoredHeight = window.height || 700
+        window.restoredX = window.x || 100
+        window.restoredY = window.y || 100
+        window.maximized = true
+      }
     }
   }
 
@@ -252,11 +414,13 @@ export const useWindows = () => {
     selectedIcon,
     dateTime,
     apps,
+    menuItems,
     initializeDateTime,
     updateDateTime,
     toggleStartMenu,
     closeStartMenu,
     openApp,
+    openPage,
     focusWindow,
     closeWindow,
     minimizeWindow,

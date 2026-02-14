@@ -1,14 +1,14 @@
 <template>
   <div dir="rtl" lang="fa">
-
     <!-- لودینگ -->
     <Loading v-if="loading" />
 
-    <AdminSidebar :collapsed="isCollapsed" @toggle="toggleSidebar" />
+    <!-- <AdminSidebar :collapsed="isCollapsed" @toggle="toggleSidebar" /> -->
 
-    <AdminNavbar :collapsed="isCollapsed" />
+    <!-- <AdminNavbar :collapsed="isCollapsed" /> -->
 
-    <main class="main-content" :class="{ expanded: !isCollapsed }">
+    <main class="main-content">
+      <!-- :class="{ expanded: !isCollapsed }" -->
       <slot />
     </main>
 
@@ -20,16 +20,16 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '~/components/useAuth'
 
-import AdminSidebar from '~/components/admin/Sidebar.vue'
-import AdminNavbar from '~/components/admin/Navbar.vue'
+// import AdminSidebar from '~/components/admin/Sidebar.vue'
+// import AdminNavbar from '~/components/admin/Navbar.vue'
 
 const authStore = useAuth()
-const isCollapsed = ref(false)
+// const isCollapsed = ref(false)
 const loading = ref(false)
 
-const toggleSidebar = () => {
-  isCollapsed.value = !isCollapsed.value
-}
+// const toggleSidebar = () => {
+//   isCollapsed.value = !isCollapsed.value
+// }
 
 const router = useRouter()
 

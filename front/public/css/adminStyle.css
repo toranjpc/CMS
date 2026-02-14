@@ -1,9 +1,22 @@
+.main-content {
+    /* position: absolute; */
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    margin: 0;
+    top: 0;
+    right: 0;
+}
+
+
+/*
+
 /* @font-face {
     font-family: BaseeFont;
     font-style: normal;
     font-weight: bold;
     src: url('./fonts/IRANSansX-Bold.woff') format("woff"), url('./fonts/IRANSansX-Bold.woff2') format("woff2")
-} */
+} * /
 
 @font-face {
     font-family: 'BaseeFont';
@@ -31,15 +44,11 @@ body {
     font-size: 18px;
 }
 
-/* تم آبی-فیروزه‌ای */
 :root {
     --primary-color: #1e90ff;
-    /* آبی */
     --secondary-color: #40e0d0;
-    /* فیروزه‌ای */
 }
 
-/* منوی کناری */
 .sidebar {
     width: 180px;
     max-width: 100%;
@@ -78,7 +87,6 @@ body {
 
 .sidebar-menu li {
     padding: 10px 15px;
-    /* border-bottom: 1px solid rgba(255, 255, 255, 0.1); */
 }
 
 .sidebar-menu li a {
@@ -92,19 +100,16 @@ body {
     margin-left: 10px;
 }
 
-/* لینک فعال */
 .sidebar-menu li a.active {
     color: var(--secondary-color);
     font-weight: bold;
 }
 
-/* زیرمنوها */
 .submenu {
     list-style: none;
     padding: 0;
     margin: 0;
     padding-right: 20px;
-    /* max-height: 0; */
     overflow: hidden;
     transition: max-height 0.3s ease;
 }
@@ -124,12 +129,10 @@ body {
     margin-left: 10px;
 }
 
-/* نمایش زیرمنوها وقتی کلاس open وجود دارد */
 .submenu.open {
     max-height: 200px;
 }
 
-/* نوار بالایی */
 .navbar {
     background-color: white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -162,7 +165,6 @@ body {
 }
 
 
-/* محتوای اصلی */
 .main-content {
     margin-right: 50px;
     padding: 70px 20px 20px;
@@ -173,18 +175,15 @@ body {
     margin-right: 180px;
 }
 
-/* دکمه جمع‌شدن منو */
 .toggle-btn {
     background-color: transparent;
     border: none;
     color: white;
-    /* padding: 10px; */
     border-radius: 5px;
     cursor: pointer;
     font-size: 1.5em;
 }
 
-/* استایل لودینگ */
 .loading-overlay {
     position: absolute;
     top: 0;
@@ -227,7 +226,6 @@ body {
 
 
 
-/* Table row selection styles */
 table.table td,
 table.table th {
     vertical-align: middle;
@@ -259,7 +257,6 @@ table.table tbody tr.selected.current-row td {
 
 
 
-/* Hover effects for selectable rows */
 table.table tbody tr {
     cursor: pointer;
     transition: all 0.2s ease;
@@ -298,10 +295,8 @@ tr:hover .actionBTN {
     font-size: 13px;
 }
 
-/* صفحه‌نمایش‌های کوچک (موبایل) - عرض کمتر از 768px */
 @media (max-width: 767px) {}
 
-/* صفحه‌نمایش‌های متوسط (تبلت) - عرض بین 768px تا 991px */
 @media (min-width: 768px) {
     .sidebar.collapsed {
         width: 50px;
@@ -325,10 +320,9 @@ tr:hover .actionBTN {
 
 @media (min-width: 768px) and (max-width: 991px) {}
 
-/* صفحه‌نمایش‌های بزرگ (دسکتاپ) - عرض بین 992px تا 1199px */
 @media (min-width: 992px) {}
 
 @media (min-width: 992px) and (max-width: 1199px) {}
 
-/* صفحه‌نمایش‌های خیلی بزرگ (دسکتاپ بزرگ) - عرض 1200px به بالا */
 @media (min-width: 1200px) {}
+*/
