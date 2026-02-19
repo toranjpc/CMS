@@ -127,6 +127,7 @@ import Loading from '@/components/Loading.vue'
 import dateFild from '@/components/widgets/dateFild'
 import CurrencyInput from '@/components/widgets/CurrencyInput.vue'
 import Swal from 'sweetalert2'
+import { useWindowQuery } from '@/composables/useWindowQuery'
 
 definePageMeta({
   layout: 'dashboard',
@@ -136,6 +137,7 @@ definePageMeta({
 
 const { $api } = useNuxtApp()
 const route = useRoute()
+const { query: windowQuery } = useWindowQuery()
 
 const pageLoading = ref(true)
 const loading = ref(false)
@@ -157,17 +159,19 @@ const invoiceNumber = ref('')
 const linkedInvoice = ref(null)
 const loadedTransaction = ref(null)
 
-const hasRouteTransaction = computed(() => Boolean(route.query.transaction))
-const isViewingFromList = computed(() => hasRouteTransaction.value && route.query.mode === 'view')
+const hasRouteTransaction = computed(() => Boolean(windowQuery.value.transaction))
+const isViewingFromList = computed(() => hasRouteTransaction.value && windowQuery.value.mode === 'view')
 const submitButtonText = computed(() => (loadedTransaction.value?.id ? 'ويرايش سند' : 'ثبت سند'))
 
 onMounted(async () => {
   try {
-    await loadNextNumber()
-
-    if (route.query.transaction) {
-      transactionNumber.value = String(route.query.transaction)
+    // اگر query string برای transaction وجود دارد، آن را load کن
+    if (windowQuery.value.transaction) {
+      transactionNumber.value = String(windowQuery.value.transaction)
       await loadExistingTransaction()
+    } else {
+      // در غیر این صورت، شماره جدید را بگیر (حالت ایجاد)
+      await loadNextNumber()
     }
   } finally {
     pageLoading.value = false

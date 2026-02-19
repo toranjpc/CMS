@@ -230,6 +230,7 @@ import Loading from '@/components/Loading.vue'
 import dateFild from '@/components/widgets/dateFild'
 import CurrencyInput from '@/components/widgets/CurrencyInput.vue'
 import Swal from 'sweetalert2'
+import { useWindowQuery } from '@/composables/useWindowQuery'
 
 definePageMeta({
   layout: 'dashboard',
@@ -238,6 +239,7 @@ definePageMeta({
 
 const { $api } = useNuxtApp()
 const route = useRoute()
+const { query: windowQuery } = useWindowQuery()
 
 const pageLoading = ref(true)
 const loading = ref(false)
@@ -266,8 +268,8 @@ const transactionForm = ref({
   transaction_date: new Date().toISOString().split('T')[0],
   description: ''
 })
-const hasRouteInvoice = computed(() => Boolean(route.query.invoice))
-const isViewingFromList = computed(() => hasRouteInvoice.value && route.query.mode === 'view')
+const hasRouteInvoice = computed(() => Boolean(windowQuery.value.invoice))
+const isViewingFromList = computed(() => hasRouteInvoice.value && windowQuery.value.mode === 'view')
 const submitButtonText = computed(() =>
   loadedInvoice.value?.id ? 'ویرایش فاکتور' : 'ثبت فاکتور'
 )
@@ -286,8 +288,8 @@ onMounted(async () => {
     const response = await $api('invoices/lastid', { method: 'POST', body: { type: 'sell' } })
     invoiceNumber.value = response.data
 
-    if (route.query.invoice) {
-      invoiceNumber.value = String(route.query.invoice)
+    if (windowQuery.value.invoice) {
+      invoiceNumber.value = String(windowQuery.value.invoice)
       await loadExistingInvoice()
     }
   } catch (error) {

@@ -42,13 +42,6 @@ function createWindowsInstance() {
       type: 'page',
       parent: 'users'
     },
-    users_plans: {
-      title: 'پل‌های کاربری',
-      icon: 'fa fa-list',
-      route: '/dashboard/users/plans',
-      type: 'page',
-      parent: 'users'
-    },
     products_add: {
       title: 'ایجاد محصول جدید',
       icon: 'fa fa-plus',
