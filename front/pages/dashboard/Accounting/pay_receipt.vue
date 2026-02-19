@@ -165,13 +165,11 @@ const submitButtonText = computed(() => (loadedTransaction.value?.id ? 'ويرا
 
 onMounted(async () => {
   try {
-    // اگر query string برای transaction وجود دارد، آن را load کن
+    await loadNextNumber()
+
     if (windowQuery.value.transaction) {
       transactionNumber.value = String(windowQuery.value.transaction)
       await loadExistingTransaction()
-    } else {
-      // در غیر این صورت، شماره جدید را بگیر (حالت ایجاد)
-      await loadNextNumber()
     }
   } finally {
     pageLoading.value = false
