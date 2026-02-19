@@ -17,6 +17,7 @@ class InvoiceItem extends Model
         'product_id',
         'product_item_id',
         'warehouse_id',
+        'app_id',
         'quantity',
         'unit_price',
         'total_price',
@@ -54,5 +55,10 @@ class InvoiceItem extends Model
     public function warehouse()
     {
         return $this->belongsTo(ProductOption::class, 'warehouse_id');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(\Modules\App\Models\App::class);
     }
 }

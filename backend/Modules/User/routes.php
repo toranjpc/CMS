@@ -48,6 +48,18 @@ Route::prefix('users')
             Route::patch('{id}/restore', [UserController::class, 'job_restore'])->name('restore');
         });
 
+        Route::prefix('plans')->name('plans.')->group(function () {
+            Route::get('/', [UserController::class, 'plan_index'])->name('index');
+            Route::get('/list', [UserController::class, 'plan_index'])->name('list');
+            Route::post('/list', [UserController::class, 'plan_index'])->name('listSearch');
+            Route::post('{id}', [UserController::class, 'plan_show'])->name('show');
+            Route::post('/', [UserController::class, 'plan_store'])->name('store');
+            Route::put('{plan}', [UserController::class, 'plan_update'])->name('update');
+            Route::delete('{plan}', [UserController::class, 'plan_destroy'])->name('destroy');
+            Route::delete('{id}/force', [UserController::class, 'plan_force_destroy'])->name('force_destroy');
+            Route::patch('{id}/restore', [UserController::class, 'plan_restore'])->name('restore');
+        });
+
         Route::get('/', [UserController::class, 'index'])->name('index');
         Route::post('/list', [UserController::class, 'index'])->name('indexSearch');
         Route::post('{userId}', [UserController::class, 'show'])->name('show');

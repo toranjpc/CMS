@@ -14,8 +14,14 @@ class Log extends Model
         "table_id",
         "type",
         "data",
+        "app_id",
     ];
     protected $casts = [
         'data' => 'array',
     ];
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
+    }
 }

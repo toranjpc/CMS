@@ -35,6 +35,7 @@ class AppObserver
         $old = $type === 'create' ? null : $model->getOriginal();
         $new = $model->getChanges();
 
+        // برای App، app_id خود model است
         LogActionJob::dispatch(
             auth()->id() ?? null,
             $model->getTable(),
@@ -43,7 +44,8 @@ class AppObserver
             [
                 'old' => $old,
                 'new' => $new
-            ]
+            ],
+            $model->id // App خودش app_id است
         );
     }
 }

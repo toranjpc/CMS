@@ -1,13 +1,15 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Accounting\Http\Controllers\ProductController;
-
+use Modules\App\Http\Controllers\AppController;
 
 Route::prefix('apps')->middleware('auth:sanctum')->name('apps.')->group(function () {
-    Route::get('/', [ProductController::class, 'index'])->name('index');
-    Route::get('{id}', [ProductController::class, 'show'])->name('show');
-    Route::post('/', [ProductController::class, 'store'])->name('store');
-    Route::put('{id}', [ProductController::class, 'update'])->name('update');
-    Route::delete('{id}', [ProductController::class, 'destroy'])->name('destroy');
+    Route::get('/', [AppController::class, 'index'])->name('index');
+    Route::post('/list', [AppController::class, 'index'])->name('indexSearch');
+    Route::post('{id}', [AppController::class, 'show'])->name('show');
+    Route::post('/', [AppController::class, 'store'])->name('store');
+    Route::put('{id}', [AppController::class, 'update'])->name('update');
+    Route::delete('{id}', [AppController::class, 'destroy'])->name('destroy');
+    Route::patch('{id}/restore', [AppController::class, 'restore'])->name('restore');
+    Route::delete('{id}/force', [AppController::class, 'forceDestroy'])->name('force_destroy');
 });

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\User\Models\ExtData;
+use Modules\App\Models\App;
 
 class Product extends Model
 {
@@ -15,6 +16,7 @@ class Product extends Model
         'title',
         'barcode',
         'user_id',
+        'app_id',
         'album',
         'tags',
         'des',
@@ -102,5 +104,10 @@ class Product extends Model
         )
             ->where('extdatas.kind', 'ProductWarehouse')
             ->where('product_options.kind', 'warehouse');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
     }
 }

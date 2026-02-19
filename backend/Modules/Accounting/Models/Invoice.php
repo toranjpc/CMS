@@ -16,6 +16,7 @@ class Invoice extends Model
         'type',
         'invoice_number',
         'party_id',
+        'app_id',
         'date',
         'subtotal',
         'discount',
@@ -86,5 +87,10 @@ class Invoice extends Model
     public function isPaid(): bool
     {
         return $this->remain_amount <= 0;
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(\Modules\App\Models\App::class);
     }
 }

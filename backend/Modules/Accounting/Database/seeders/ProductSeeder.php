@@ -368,5 +368,24 @@ class ProductSeeder extends Seeder
                 ]);
             }
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Bank (صندوق)
+        |--------------------------------------------------------------------------
+        */
+        ProductOption::create([
+            'title' => 'صندوق',
+            'f_id' => null,
+            'kind' => 'bank',
+            'option' => [
+                'sheba' => null,
+                'account_number' => null,
+                'card_number' => null,
+                'has_pos' => false,
+            ],
+            'des' => 0, // موجودی اولیه
+            'status' => 1,
+        ]);
     }
 }

@@ -2,7 +2,7 @@
     <div class="" style="gap: 10px;">
         <div class="w-100">
             <input type="text" class="form-control text-center" v-model="searchableID" :placeholder="props.placeholder"
-                @keyup="searchById" @focus="$event.target.select()" :disabled="disabled">
+                @keyup="searchById" @keydown.enter.prevent @focus="$event.target.select()" :disabled="disabled">
         </div>
         <!-- <div class="w-100" :class="searchResultLable ? 'pt-1' : ''">
             <span v-html="searchResultLable"></span>
@@ -13,7 +13,7 @@
         <div class="shadow" @click="searchByTextDialog = false"></div>
         <div class="dialogBody">
             <div class="header">
-                <input type="text" class="form-control" v-model="searchByTextFilde" ref="inputRef" @keyup="searchByText"
+                <input type="text" class="form-control" v-model="searchByTextFilde" ref="inputRef" @keyup="searchByText" @keydown.enter.prevent
                     :autofocus="searchByTextDialog">
             </div>
             <div class="body">
@@ -137,6 +137,13 @@ const searchById = async (e) => {
     clearTimeout(keyupdelay)
     const si = searchableID.value;
     const key = e.which || e.keyCode || 0;
+    
+    // Prevent form submission when Enter is pressed
+    if (key == 13) {
+        e.preventDefault()
+        e.stopPropagation()
+    }
+    
     if (previousIdValue.value === si && key != 13) return
     previousIdValue.value = si
     searchResultLable.value = ''
@@ -201,6 +208,13 @@ const searchByText = async (e) => {
     clearTimeout(keyupdelay)
     const sbtfv = searchByTextFilde.value
     const key = e.which || e.keyCode || 0;
+    
+    // Prevent form submission when Enter is pressed
+    if (key == 13) {
+        e.preventDefault()
+        e.stopPropagation()
+    }
+    
     if (previousTextValue.value === sbtfv && key != 13) return
     previousTextValue.value = sbtfv
     baseDatas.value = []
@@ -270,6 +284,7 @@ const handleDialogKeydown = (e) => {
 
         case 'Enter':
             e.preventDefault()
+            e.stopPropagation()
             if (selectedIndex.value >= 0 && baseDatas.value.data[selectedIndex.value]) {
                 selectRow(baseDatas.value.data[selectedIndex.value])
             }

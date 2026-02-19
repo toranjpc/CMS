@@ -18,6 +18,7 @@ class Transaction extends Model
         'party_id',
         'beneficiary_party_id',
         'transfer_group_id',
+        'app_id',
         'amount',
         'payment_method',
         'invoice_id',
@@ -59,5 +60,10 @@ class Transaction extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(\Modules\App\Models\App::class);
     }
 }

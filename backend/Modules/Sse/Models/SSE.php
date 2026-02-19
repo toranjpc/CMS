@@ -3,6 +3,7 @@
 namespace Modules\Sse\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\App\Models\App;
 
 class SSE extends Model
 {
@@ -11,6 +12,16 @@ class SSE extends Model
     public $incrementing = false;
 
     public $table = 'sse';
+
+    protected $fillable = [
+        'id',
+        'model',
+        'event',
+        'receiver_id',
+        'title',
+        'message',
+        'app_id',
+    ];
 
     protected $casts = [
         'message' => 'array'
@@ -24,5 +35,10 @@ class SSE extends Model
             $table->id =
                 \Str::random(15);
         });
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
     }
 }

@@ -1,12 +1,7 @@
 <template>
   <div class="product-add-page">
-    <div class="row mb-4">
+    <div class="row mb0-4">
       <div class="col-12">
-        <h1 class="fw-bold mb-0">
-          <span v-if="isAdd">ایجاد محصول جدید</span>
-          <span v-else-if="isEdit">ویرایش محصول | {{ product.title || '...' }}</span>
-          <span v-else-if="isView">مشاهده محصول | {{ product.title || '...' }}</span>
-        </h1>
       </div>
     </div>
 
@@ -20,7 +15,7 @@
                 <!-- دکمه‌های مدیریت برای حالت view -->
                 <template v-if="isView">
                   <button type="button" class="btn btn-primary" @click="goToEdit">
-                    <i class="fa fa-pencil me-1"></i>
+                    <i class="fa fa-edit me-1"></i>
                     ویرایش
                   </button>
                   <button type="button" class="btn btn-danger" @click="deleteProduct">
@@ -329,7 +324,7 @@ import Swal from 'sweetalert2'
 import CurrencyInput from '@/components/widgets/CurrencyInput.vue'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'windows',
   middleware: 'auth',
   title: 'مدیریت محصول'
 })

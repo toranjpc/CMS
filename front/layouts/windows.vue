@@ -5,24 +5,24 @@
       <!-- Desktop Icons -->
       <div class="desktop-icons" ref="desktopIconsRef">
         <div 
-          v-for="(app, appName, index) in windowsApps" 
-          :key="appName"
+          v-for="(item, itemKey, index) in menuItems" 
+          :key="itemKey"
           class="desktop-icon"
           :class="{ 
-            selected: selectedIcon === appName, 
-            dragging: isDraggingIcon && iconDragging.appName === appName 
+            selected: selectedIcon === itemKey, 
+            dragging: isDraggingIcon && iconDragging.appName === itemKey 
           }"
-          :data-app="appName"
-          :style="getIconStyle(appName, index)"
-          @dblclick="openApp(appName)"
-          @mousedown="startIconDrag($event, appName, index)"
-          @click="selectIcon(appName)"
-          @contextmenu.prevent="handleContextMenu($event, appName)"
+          :data-app="itemKey"
+          :style="getIconStyle(itemKey, index)"
+          @dblclick="openApp(itemKey)"
+          @mousedown="startIconDrag($event, itemKey, index)"
+          @click="selectIcon(itemKey)"
+          @contextmenu="handleContextMenu($event, itemKey)"
         >
           <div class="icon-image">
-            <i :class="app.icon"></i>
+            <i :class="item.icon"></i>
           </div>
-          <span class="icon-label">{{ app.title }}</span>
+          <span class="icon-label">{{ item.title }}</span>
         </div>
       </div>
 
@@ -54,12 +54,7 @@
             </div>
           </div>
           <div class="window-content" v-show="!window.minimized">
-            <iframe 
-              v-if="window.route" 
-              :src="window.route" 
-              frameborder="0"
-              style="width: 100%; height: 100%; border: none;"
-            ></iframe>
+            <WindowPageLoader v-if="window.route" :route="window.route" :key="window.id" />
             <div v-else-if="window.content" v-html="window.content"></div>
           </div>
         </div>
@@ -194,6 +189,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '~/components/useAuth'
+import WindowPageLoader from '~/components/WindowPageLoader.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -242,7 +238,8 @@ const groupedMenuItems = computed(() => {
     main: {},
     users: {},
     products: {},
-    accounting: {}
+    accounting: {},
+    system: {}
   }
   
   Object.entries(menuItems).forEach(([key, item]) => {
@@ -254,6 +251,8 @@ const groupedMenuItems = computed(() => {
       groups.products[key] = item
     } else if (item.parent === 'accounting') {
       groups.accounting[key] = item
+    } else if (item.parent === 'system') {
+      groups.system[key] = item
     }
   })
   
@@ -272,7 +271,8 @@ const getGroupIcon = (groupName) => {
   const icons = {
     users: 'fa fa-users',
     products: 'fa fa-tags',
-    accounting: 'fa fa-file'
+    accounting: 'fa fa-file',
+    system: 'fa fa-cog'
   }
   return icons[groupName] || 'fa fa-folder'
 }
@@ -282,35 +282,79 @@ const getGroupTitle = (groupName) => {
   const titles = {
     users: 'کاربران',
     products: 'محصولات',
-    accounting: 'عملیات حسابداری'
+    accounting: 'عملیات حسابداری',
+    system: 'سیستم'
   }
   return titles[groupName] || groupName
 }
 
-// Calculate initial grid position for icons
+// Get desktop bounds (considering taskbar)
+const getDesktopBounds = () => {
+  if (typeof window === 'undefined') {
+    return { width: 1920, height: 1080 }
+  }
+  const taskbarHeight = 50
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight - taskbarHeight
+  }
+}
+
+// Constrain icon position to desktop bounds
+const constrainIconPosition = (x, y) => {
+  const bounds = getDesktopBounds()
+  const iconWidth = 80
+  const iconHeight = 100
+  const padding = 5 // Small padding from edges
+  
+  return {
+    x: Math.max(padding, Math.min(x, bounds.width - iconWidth - padding)),
+    y: Math.max(padding, Math.min(y, bounds.height - iconHeight - padding))
+  }
+}
+
+// Calculate initial grid position for icons (Windows-style: multiple columns)
 const getInitialIconPosition = (index) => {
   if (typeof window === 'undefined') {
     return { x: 20, y: 20 }
   }
+  const bounds = getDesktopBounds()
   const iconWidth = 80
   const iconHeight = 100
   const padding = 20
-  const screenWidth = window.innerWidth || 1920
-  const colsPerRow = Math.floor((screenWidth - padding * 2) / iconWidth)
+  const spacing = 10 // Space between icons
+  
+  // Calculate how many columns fit in the desktop width
+  const availableWidth = bounds.width - (padding * 2)
+  const iconsPerRow = Math.floor(availableWidth / (iconWidth + spacing))
+  const colsPerRow = Math.max(1, iconsPerRow) // At least 1 column
+  
+  // Calculate row and column for this icon
   const row = Math.floor(index / colsPerRow)
   const col = index % colsPerRow
-  return {
-    x: padding + (col * iconWidth),
-    y: padding + (row * iconHeight)
+  
+  // Windows-style: icons start from top-left, arranged in columns
+  const position = {
+    x: padding + (col * (iconWidth + spacing)),
+    y: padding + (row * (iconHeight + spacing))
   }
+  
+  // Ensure initial position is within bounds
+  return constrainIconPosition(position.x, position.y)
 }
 
 const getIconStyle = (appName, index) => {
   const pos = iconPositions.value[appName]
   if (pos) {
+    // Ensure saved position is within bounds
+    const constrainedPos = constrainIconPosition(pos.x, pos.y)
+    // Update if position was constrained
+    if (constrainedPos.x !== pos.x || constrainedPos.y !== pos.y) {
+      iconPositions.value[appName] = constrainedPos
+    }
     return {
-      left: `${pos.x}px`,
-      top: `${pos.y}px`,
+      left: `${constrainedPos.x}px`,
+      top: `${constrainedPos.y}px`,
       position: 'absolute'
     }
   }
@@ -356,29 +400,23 @@ const handleIconMouseMove = (event) => {
   if (typeof window === 'undefined') return
   
   if (isDraggingIcon.value && iconDragging.value.appName) {
-    const desktopRect = desktopIconsRef.value?.getBoundingClientRect() || { 
-      left: 0, 
-      top: 0, 
-      width: window.innerWidth, 
-      height: window.innerHeight - 50 
-    }
+    const desktopRect = desktopIconsRef.value?.getBoundingClientRect()
+    if (!desktopRect) return
+    
     const appName = iconDragging.value.appName
     
     let x = event.clientX - desktopRect.left - iconDragging.value.offsetX
     let y = event.clientY - desktopRect.top - iconDragging.value.offsetY
     
     // Constrain to desktop bounds
-    const iconWidth = 80
-    const iconHeight = 100
-    x = Math.max(0, Math.min(x, desktopRect.width - iconWidth))
-    y = Math.max(0, Math.min(y, desktopRect.height - iconHeight))
+    const constrainedPos = constrainIconPosition(x, y)
     
     // Update position
     if (!iconPositions.value[appName]) {
       iconPositions.value[appName] = { x: 0, y: 0 }
     }
-    iconPositions.value[appName].x = x
-    iconPositions.value[appName].y = y
+    iconPositions.value[appName].x = constrainedPos.x
+    iconPositions.value[appName].y = constrainedPos.y
   }
 }
 
@@ -398,7 +436,21 @@ const handleIconMouseUp = () => {
 }
 
 const handleContextMenu = (event, appName) => {
+  event.preventDefault()
+  event.stopPropagation()
   showContextMenu(event.clientX, event.clientY, appName)
+}
+
+// Prevent default context menu everywhere except on icons
+const handleGlobalContextMenu = (event) => {
+  // If clicking on desktop icon, let the icon's handler manage it
+  if (event.target.closest('.desktop-icon')) {
+    // The icon's handler will prevent default and show custom menu
+    return
+  }
+  // For all other places, prevent default browser context menu
+  event.preventDefault()
+  event.stopPropagation()
 }
 
 // Window styles
@@ -499,21 +551,34 @@ onMounted(() => {
     
     // Load saved icon positions
     const savedPositions = getIconPositions()
-    iconPositions.value = savedPositions
+    // Constrain saved positions to desktop bounds
+    const constrainedPositions = {}
+    Object.keys(savedPositions).forEach(key => {
+      const pos = savedPositions[key]
+      if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+        constrainedPositions[key] = constrainIconPosition(pos.x, pos.y)
+        // Save corrected position if it was changed
+        if (constrainedPositions[key].x !== pos.x || constrainedPositions[key].y !== pos.y) {
+          saveIconPosition(key, constrainedPositions[key].x, constrainedPositions[key].y)
+        }
+      }
+    })
+    iconPositions.value = constrainedPositions
     
     // Initialize positions for icons that don't have saved positions
-    const appsArray = Object.keys(windowsApps)
-    appsArray.forEach((appName, index) => {
-      if (!iconPositions.value[appName]) {
+    const menuItemsArray = Object.keys(menuItems)
+    menuItemsArray.forEach((itemKey, index) => {
+      if (!iconPositions.value[itemKey]) {
         const initialPos = getInitialIconPosition(index)
-        iconPositions.value[appName] = initialPos
-        saveIconPosition(appName, initialPos.x, initialPos.y)
+        iconPositions.value[itemKey] = initialPos
+        saveIconPosition(itemKey, initialPos.x, initialPos.y)
       }
     })
     
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('click', handleClickOutside)
+    document.addEventListener('contextmenu', handleGlobalContextMenu)
   }
 })
 
@@ -522,6 +587,7 @@ onUnmounted(() => {
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
     document.removeEventListener('click', handleClickOutside)
+    document.removeEventListener('contextmenu', handleGlobalContextMenu)
   }
 })
 
@@ -550,12 +616,7 @@ definePageMeta({
 
 .window-content {
   overflow: hidden;
+  overflow-y: auto;
 }
 
-.window-content iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
 </style>

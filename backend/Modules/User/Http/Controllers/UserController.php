@@ -806,4 +806,196 @@ class UserController extends Controller
         ], 200);
     }
     /******* Jobs *******/
+
+    /******* Plans *******/
+    public function plan_index(Request $request)
+    {
+        try {
+            $Options = Option::select('id', 'title', 'option', 'status', 'created_at', 'updated_at', 'deleted_at')
+                ->where("kind", "Plan");
+            
+            // Support both GET and POST
+            $title = $request->input('title') ?? $request->input('values');
+            if (!empty($title)) {
+                $Options = $Options->where('title', 'LIKE', '%' . $title . '%');
+            }
+            
+            if (!empty($request->input('status')) && $request->input('status') == "deleted") {
+                $Options = $Options->onlyTrashed();
+            }
+            
+            $Options = $Options->orderBy('id', 'DESC')->paginate($request->input("limit", 10));
+            $Options = [
+                'data' => $Options->items(),
+                'total' => $Options->total(),
+                'per_page' => $Options->perPage(),
+                'current_page' => $Options->currentPage(),
+                'last_page' => $Options->lastPage(),
+                'from' => $Options->firstItem(),
+                'to' => $Options->lastItem(),
+            ];
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "items" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    "status" => "error",
+                    "message" => $th->getMessage()
+                ],
+                500
+            );
+        }
+    }
+
+    public function plan_show($id)
+    {
+        return response()->json(Option::findOrFail($id));
+    }
+
+    public function plan_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique('options', 'title')
+                            ->where(function ($query) {
+                                $query->whereNull('f_id')
+                                    ->where('kind', 'Plan')
+                                    ->whereNull('deleted_at');
+                            }),
+                    ],
+                    'option' => 'nullable|array',
+                    'status' => 'nullable|integer|in:0,1',
+                ],
+                [
+                    'title.required' => 'عنوان پلن الزامی است',
+                    'title.string' => 'عنوان پلن باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان پلن نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'option.array' => 'فرمت گزینه‌ها نامعتبر است',
+                    'status.integer' => 'وضعیت باید عدد باشد',
+                ]
+            );
+
+            $plan = Option::create([
+                "f_id" => null,
+                "title" => $data['title'],
+                "option" => $data['option'] ?? [],
+                "kind" => "Plan",
+                "status" => $data['status'] ?? 1,
+            ]);
+
+            return response()->json([
+                "status" => "success",
+                "data" => $plan
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت پلن رخ داد",
+            ], 500);
+        }
+    }
+
+    public function plan_update(Request $request, Option $plan)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique('options', 'title')
+                            ->where(function ($query) {
+                                $query->whereNull('f_id')
+                                    ->where('kind', 'Plan')
+                                    ->whereNull('deleted_at');
+                            })
+                            ->ignore($plan->id),
+                    ],
+                    'option' => 'nullable|array',
+                    'status' => 'nullable|integer|in:0,1',
+                ],
+                [
+                    'title.required' => 'عنوان پلن الزامی است',
+                    'title.string' => 'عنوان پلن باید به‌صورت متن باشد',
+                    'title.max' => 'عنوان پلن نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این عنوان قبلاً ثبت شده است',
+                    'option.array' => 'فرمت گزینه‌ها نامعتبر است',
+                    'status.integer' => 'وضعیت باید عدد باشد',
+                ]
+            );
+
+            $plan->title = $data['title'];
+            if (isset($data['option'])) {
+                $plan->option = $data['option'];
+            }
+            if (isset($data['status'])) {
+                $plan->status = $data['status'];
+            }
+            $plan->update();
+
+            return response()->json([
+                "status" => "success",
+                "data" => $plan
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش پلن رخ داد",
+            ], 500);
+        }
+    }
+
+    public function plan_destroy(Option $plan)
+    {
+        $plan->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "پلن با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function plan_force_destroy($id)
+    {
+        $plan = Option::withTrashed()->findOrFail($id);
+        $plan->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "پلن به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function plan_restore($id)
+    {
+        $plan = Option::withTrashed()->findOrFail($id);
+        $plan->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "پلن بازیابی شد",
+            "data" => $plan
+        ], 200);
+    }
+    /******* Plans *******/
 }

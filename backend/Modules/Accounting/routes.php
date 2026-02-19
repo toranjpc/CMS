@@ -70,6 +70,17 @@ Route::prefix('products')
             Route::patch('{id}/restore', [ProductController::class, 'warehouse_restore'])->name('restore');
         });
 
+        Route::prefix('banks')->name('banks.')->group(function () {
+            Route::get('/', [ProductController::class, 'bank_index'])->name('index');
+            Route::post('/list', [ProductController::class, 'bank_index'])->name('indexSearch');
+            Route::post('{id}', [ProductController::class, 'bank_show'])->name('show');
+            Route::post('/', [ProductController::class, 'bank_store'])->name('store');
+            Route::put('{bank}', [ProductController::class, 'bank_update'])->name('update');
+            Route::delete('{bank}', [ProductController::class, 'bank_destroy'])->name('destroy');
+            Route::delete('{id}/force', [ProductController::class, 'bank_force_destroy'])->name('forceDestroy');
+            Route::patch('{id}/restore', [ProductController::class, 'bank_restore'])->name('restore');
+        });
+
 
         Route::get('/', [ProductController::class, 'index'])->name('index');
         Route::post('/list', [ProductController::class, 'index'])->name('indexSearch');

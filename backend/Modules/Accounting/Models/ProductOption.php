@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\User\Models\ExtData;
+use Modules\App\Models\App;
 
 class ProductOption extends Model
 {
@@ -15,6 +16,7 @@ class ProductOption extends Model
 
     protected $fillable = [
         'f_id',
+        'app_id',
         'title',
         'kind',
         'option',
@@ -42,5 +44,10 @@ class ProductOption extends Model
     public function quizResults()
     {
         return $this->hasOne(ExtData::class, 'f_id', 'id')->select('f_id', 'm_id', 'data')->where('data->endQuiz', "1")->where('kind', 'like', 'quizAns');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
     }
 }

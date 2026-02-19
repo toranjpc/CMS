@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\App\Models\App;
 
 class User extends Authenticatable
 {
@@ -16,6 +17,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         "f_id",
+        "app_id",
         "sex",
         "ircode",
         "name",
@@ -95,5 +97,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(ExtData::class, 'f_id', 'id')
             ->where('kind', 'Data');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
     }
 }

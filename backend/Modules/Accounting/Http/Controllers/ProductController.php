@@ -1355,6 +1355,229 @@ class ProductController extends Controller
     }
     /******* warehouses *******/
 
+    /******* banks *******/
+    public function bank_index()
+    {
+        try {
+            $Options = ProductOption::select('id', 'f_id', 'title', 'option', 'des', 'created_at', 'updated_at', 'deleted_at')
+                ->where("kind", "bank");
+
+            if (!empty(request('values'))) {
+                $values = request('values');
+                $Options = $Options->select('id', 'title')->where('title', 'LIKE', '%' . $values . '%');
+            } else {
+                if (!empty(request('title'))) $Options = $Options->where('title', 'LIKE', '%' . request('title') . '%');
+                if (!empty(request('status')) && request('status') == "deleted") $Options = $Options->onlyTrashed();
+            }
+            $Options = $Options->orderBy('id', 'DESC')->paginate(request("limit", 10));
+
+            return response()->json(
+                [
+                    "status" => "success",
+                    "items" => $Options
+                ],
+                200
+            );
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    "status" => "error",
+                ],
+                500
+            );
+        }
+    }
+
+    public function bank_show($id = 0)
+    {
+        if ($id) {
+            $bank = ProductOption::select("id", "title", "option", "des")->where('kind', 'bank')->find($id);
+            if (!$bank) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "بانک یافت نشد"
+                ], 404);
+            }
+            return response()->json([
+                "status" => "success",
+                "data" => $bank
+            ], 200);
+        }
+        return response()->json([
+            "status" => "unsuccess",
+            "message" => "بانک یافت نشد"
+        ], 404);
+    }
+
+    public function bank_store(Request $request)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where(function ($query) {
+                                $query->where('kind', 'bank')
+                                    ->whereNull('deleted_at');
+                            }),
+                    ],
+                    'sheba' => 'nullable|string|max:26',
+                    'account_number' => 'nullable|string|max:255',
+                    'card_number' => 'nullable|string|max:16',
+                    'has_pos' => 'nullable|boolean',
+                    'initial_balance' => 'nullable|numeric',
+                ],
+                [
+                    'title.required' => 'نام بانک الزامی است',
+                    'title.string' => 'نام بانک باید به‌صورت متن باشد',
+                    'title.max' => 'نام بانک نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این نام بانک قبلاً ثبت شده است',
+                    'sheba.string' => 'شماره شبا باید متن باشد',
+                    'sheba.max' => 'شماره شبا نباید بیشتر از ۲۶ کاراکتر باشد',
+                    'account_number.string' => 'شماره حساب باید متن باشد',
+                    'account_number.max' => 'شماره حساب نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'card_number.string' => 'شماره کارت باید متن باشد',
+                    'card_number.max' => 'شماره کارت نباید بیشتر از ۱۶ کاراکتر باشد',
+                    'has_pos.boolean' => 'فیلد کارتخوان باید مقدار بولی داشته باشد',
+                    'initial_balance.numeric' => 'موجودی اولیه باید عدد باشد',
+                ]
+            );
+
+            $option = [
+                'sheba' => $data['sheba'] ?? null,
+                'account_number' => $data['account_number'] ?? null,
+                'card_number' => $data['card_number'] ?? null,
+                'has_pos' => $data['has_pos'] ?? false,
+            ];
+
+            $bank = ProductOption::create([
+                "f_id" => null,
+                "title" => $data['title'],
+                "kind" => "bank",
+                "option" => $option,
+                "des" => $data['initial_balance'] ?? null,
+            ]);
+
+            return response()->json([
+                "status" => "success",
+                "data" => $bank
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ثبت بانک رخ داد",
+            ], 500);
+        }
+    }
+
+    public function bank_update(Request $request, ProductOption $bank)
+    {
+        try {
+            $data = $request->validate(
+                [
+                    'title' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique(ProductOption::class, 'title')
+                            ->where(function ($query) {
+                                $query->where('kind', 'bank')
+                                    ->whereNull('deleted_at');
+                            })
+                            ->ignore($bank->id),
+                    ],
+                    'sheba' => 'nullable|string|max:26',
+                    'account_number' => 'nullable|string|max:255',
+                    'card_number' => 'nullable|string|max:16',
+                    'has_pos' => 'nullable|boolean',
+                    'initial_balance' => 'nullable|numeric',
+                ],
+                [
+                    'title.required' => 'نام بانک الزامی است',
+                    'title.string' => 'نام بانک باید به‌صورت متن باشد',
+                    'title.max' => 'نام بانک نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'title.unique'   => 'این نام بانک قبلاً ثبت شده است',
+                    'sheba.string' => 'شماره شبا باید متن باشد',
+                    'sheba.max' => 'شماره شبا نباید بیشتر از ۲۶ کاراکتر باشد',
+                    'account_number.string' => 'شماره حساب باید متن باشد',
+                    'account_number.max' => 'شماره حساب نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'card_number.string' => 'شماره کارت باید متن باشد',
+                    'card_number.max' => 'شماره کارت نباید بیشتر از ۱۶ کاراکتر باشد',
+                    'has_pos.boolean' => 'فیلد کارتخوان باید مقدار بولی داشته باشد',
+                    'initial_balance.numeric' => 'موجودی اولیه باید عدد باشد',
+                ]
+            );
+
+            $option = $bank->option ?? [];
+            $option['sheba'] = $data['sheba'] ?? null;
+            $option['account_number'] = $data['account_number'] ?? null;
+            $option['card_number'] = $data['card_number'] ?? null;
+            $option['has_pos'] = $data['has_pos'] ?? false;
+
+            $bank->title = $data['title'];
+            $bank->option = $option;
+            $bank->des = $data['initial_balance'] ?? null;
+            $bank->updated_at = now();
+            $bank->update();
+
+            return response()->json([
+                "status" => "success",
+                "data" => $bank
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                "status" => "validation_error",
+                "errors" => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error(__METHOD__ . ' error', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                "status" => "error",
+                "message" => "خطایی در ویرایش بانک رخ داد",
+            ], 500);
+        }
+    }
+
+    public function bank_destroy(ProductOption $bank)
+    {
+        $bank->delete();
+        return response()->json([
+            "status" => "success",
+            "message" => "بانک با موفقیت حذف شد"
+        ], 200);
+    }
+
+    public function bank_force_destroy($id)
+    {
+        $bank = ProductOption::withTrashed()->findOrFail($id);
+        $bank->forceDelete();
+        return response()->json([
+            "status" => "success",
+            "message" => "بانک به صورت دائمی حذف شد"
+        ], 200);
+    }
+
+    public function bank_restore($id)
+    {
+        $bank = ProductOption::withTrashed()->findOrFail($id);
+        $bank->restore();
+        return response()->json([
+            "status" => "success",
+            "message" => "بانک بازیابی شد",
+            "data" => $bank
+        ], 200);
+    }
+    /******* banks *******/
+
 
 
     public function lastid()

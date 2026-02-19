@@ -5,6 +5,7 @@ namespace Modules\User\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\App\Models\App;
 
 class Option extends Model
 {
@@ -12,6 +13,7 @@ class Option extends Model
 
     protected $fillable = [
         'f_id',
+        'app_id',
         'title',
         'kind',
         'option',
@@ -29,5 +31,10 @@ class Option extends Model
     public function childs()
     {
         return $this->hasMany(Option::class, 'f_id', 'id');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
     }
 }

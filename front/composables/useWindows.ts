@@ -1,7 +1,10 @@
 // Windows-style UI composable for Nuxt
 import { ref } from 'vue'
 
-export const useWindows = () => {
+// Global windows state - singleton pattern
+let windowsInstance: ReturnType<typeof createWindowsInstance> | null = null
+
+function createWindowsInstance() {
   const openWindows = ref<any[]>([])
   const windowZIndex = ref(100)
   const isDragging = ref(false)
@@ -18,12 +21,6 @@ export const useWindows = () => {
 
   // Menu items from dashboard sidebar
   const menuItems = {
-    dashboard: {
-      title: 'داشبورد',
-      icon: 'fa fa-home',
-      route: '/dashboard',
-      type: 'page'
-    },
     users_list: {
       title: 'لیست کاربران',
       icon: 'fa fa-users',
@@ -124,6 +121,143 @@ export const useWindows = () => {
     },
     accounting_sell_list: {
       title: 'لیست فاکتورهای فروش',
+      icon: 'fa fa-list-alt',
+      route: '/dashboard/Accounting/sell_list',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_pay_receipt: {
+      title: 'ثبت سند دریافت/پرداخت',
+      icon: 'fa fa-file-signature',
+      route: '/dashboard/Accounting/pay_receipt',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_pay_receipt_list: {
+      title: 'لیست اسناد دریافت/پرداخت',
+      icon: 'fa fa-list-alt',
+      route: '/dashboard/Accounting/pay_receipt_list',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_banks: {
+      title: 'مدیریت بانک‌ها',
+      icon: 'fa fa-university',
+      route: '/dashboard/Accounting/banks',
+      type: 'page',
+      parent: 'accounting'
+    },
+    apps_list: {
+      title: 'مدیریت پورتال‌ها',
+      icon: 'fa fa-globe',
+      route: '/dashboard/apps',
+      type: 'page',
+      parent: 'system'
+    },
+    plans_list: {
+      title: 'مدیریت پلن‌ها',
+      icon: 'fa fa-list-alt',
+      route: '/dashboard/plans',
+      type: 'page',
+      parent: 'system'
+    }
+  }
+
+  // Application data (for backward compatibility)
+  const apps = {
+    users_list: {
+      title: 'لیست کاربران',
+      icon: 'fa fa-users',
+      route: '/dashboard/users',
+      type: 'page',
+      parent: 'users'
+    },
+    users_categories: {
+      title: 'دسته‌بندی کاربران',
+      icon: 'fa fa-folder',
+      route: '/dashboard/users/categories',
+      type: 'page',
+      parent: 'users'
+    },
+    users_roles: {
+      title: 'نقش‌های کاربری',
+      icon: 'fa fa-user-shield',
+      route: '/dashboard/users/roles',
+      type: 'page',
+      parent: 'users'
+    },
+     products_add: {
+      title: 'ایجاد محصول جدید',
+      icon: 'fa fa-plus',
+      route: '/dashboard/products/add',
+      type: 'page',
+      parent: 'products'
+    },
+    products_list: {
+      title: 'لیست محصولات',
+      icon: 'fa fa-tags',
+      route: '/dashboard/products',
+      type: 'page',
+      parent: 'products'
+    },
+    products_categories: {
+      title: 'دسته‌بندی ها',
+      icon: 'fa fa-folder-open',
+      route: '/dashboard/products/categories',
+      type: 'page',
+      parent: 'products'
+    },
+    products_features: {
+      title: 'ویژگی‌ها',
+      icon: 'fa fa-star',
+      route: '/dashboard/products/features',
+      type: 'page',
+      parent: 'products'
+    },
+    products_units: {
+      title: 'واحد های اندازه گیری',
+      icon: 'fa fa-ruler',
+      route: '/dashboard/products/units',
+      type: 'page',
+      parent: 'products'
+    },
+    products_brands: {
+      title: 'برندها',
+      icon: 'fa fa-certificate',
+      route: '/dashboard/products/brands',
+      type: 'page',
+      parent: 'products'
+    },
+    products_warehouses: {
+      title: 'انبار ها',
+      icon: 'fa fa-warehouse',
+      route: '/dashboard/products/warehouses',
+      type: 'page',
+      parent: 'products'
+    },
+    accounting_buy_factor: {
+      title: 'فاکتور خرید',
+      icon: 'fa fa-file-invoice',
+      route: '/dashboard/Accounting/buy_factor',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_buy_list: {
+      title: 'لیست فاکتورهای خرید',
+      icon: 'fa fa-list-alt',
+      route: '/dashboard/Accounting/buy_list',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_sell_factor: {
+      title: 'فاکتور فروش',
+      icon: 'fa fa-file-invoice-dollar',
+      route: '/dashboard/Accounting/sell_factor',
+      type: 'page',
+      parent: 'accounting'
+    },
+    accounting_sell_list: {
+      title: 'لیست فاکتورهای فروش',
       icon: 'fa fa-list-check',
       route: '/dashboard/Accounting/sell_list',
       type: 'page',
@@ -142,19 +276,29 @@ export const useWindows = () => {
       route: '/dashboard/Accounting/pay_receipt_list',
       type: 'page',
       parent: 'accounting'
+    },
+    accounting_banks: {
+      title: 'مدیریت بانک‌ها',
+      icon: 'fa fa-university',
+      route: '/dashboard/Accounting/banks',
+      type: 'page',
+      parent: 'accounting'
+    },
+    apps_list: {
+      title: 'مدیریت پورتال‌ها',
+      icon: 'fa fa-globe',
+      route: '/dashboard/apps',
+      type: 'page',
+      parent: 'system'
+    },
+    plans_list: {
+      title: 'مدیریت پلن‌ها',
+      icon: 'fa fa-list-alt',
+      route: '/dashboard/plans',
+      type: 'page',
+      parent: 'system'
     }
   }
-
-  // Application data (for backward compatibility)
-  const apps = {
-    dashboard: {
-      title: 'داشبورد',
-      icon: 'fas fa-chart-line',
-      route: '/dashboard',
-      type: 'page'
-    }
-  }
-
   // Update date and time
   const updateDateTime = () => {
     if (typeof window !== 'undefined') {
@@ -208,7 +352,7 @@ export const useWindows = () => {
 
     // Otherwise use content (legacy apps)
     const windowId = `window-${Date.now()}`
-    
+
     // Calculate center position
     let x = 100
     let y = 100
@@ -220,7 +364,7 @@ export const useWindows = () => {
       x = Math.max(0, (desktopWidth - windowWidth) / 2)
       y = Math.max(0, (desktopHeight - windowHeight) / 2)
     }
-    
+
     const windowData = {
       id: windowId,
       appName: appName,
@@ -249,7 +393,7 @@ export const useWindows = () => {
     }
 
     const windowId = `window-${Date.now()}`
-    
+
     // Calculate center position
     let x = 100
     let y = 100
@@ -261,7 +405,7 @@ export const useWindows = () => {
       x = Math.max(0, (desktopWidth - windowWidth) / 2)
       y = Math.max(0, (desktopHeight - windowHeight) / 2)
     }
-    
+
     const windowData = {
       id: windowId,
       appName: appName,
@@ -431,4 +575,11 @@ export const useWindows = () => {
     getIconPositions,
     saveIconPosition
   }
+}
+
+export const useWindows = () => {
+  if (!windowsInstance) {
+    windowsInstance = createWindowsInstance()
+  }
+  return windowsInstance
 }

@@ -14,7 +14,7 @@ export default defineNuxtConfig({
       link: [
         // { rel: 'stylesheet', href: '/blueAdmin/dist/css/app.css' },
         { rel: 'stylesheet', href: '/css/bootstrap.rtl.min.css' },
-        { rel: 'stylesheet', href: '/css/adminStyle.css' },
+        // { rel: 'stylesheet', href: '/css/adminStyle.css' },
         { rel: 'stylesheet', href: '/fonts/font-awesome.min.css' },
         // { rel: 'stylesheet', href: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css' }
       ],

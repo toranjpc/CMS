@@ -43,7 +43,8 @@ class ProductObserver
             [
                 'old' => $old,
                 'new' => $new
-            ]
+            ],
+            $model->app_id ?? null
         );
     }
 }

@@ -57,6 +57,7 @@ class UserServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, function ($event) {
             $userId = $event->user->id ?? null;
+            $appId = $event->user->app_id ?? null;
             LogActionJob::dispatch(
                 $userId,
                 'users',
@@ -65,11 +66,13 @@ class UserServiceProvider extends ServiceProvider
                 [
                     'ip' => request()->ip(),
                     'user_agent' => request()->userAgent()
-                ]
+                ],
+                $appId
             );
         });
         Event::listen(Logout::class, function ($event) {
             $userId = $event->user->id ?? null;
+            $appId = $event->user->app_id ?? null;
             LogActionJob::dispatch(
                 $userId,
                 'users',
@@ -78,7 +81,8 @@ class UserServiceProvider extends ServiceProvider
                 [
                     'ip' => request()->ip(),
                     'user_agent' => request()->userAgent()
-                ]
+                ],
+                $appId
             );
         });
     }

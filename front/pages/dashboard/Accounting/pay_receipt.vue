@@ -1,7 +1,6 @@
 <template>
   <Loading v-if="pageLoading" />
   <div v-else>
-    <h2 class="text-center">{{ loadedTransaction?.id ? 'ويرايش سند دريافت/پرداخت' : 'ثبت سند دريافت/پرداخت' }}</h2>
     <div v-if="isViewingFromList" class="alert alert-info py-2">
       حالت نمايش فعال است و امکان ويرايش وجود ندارد.
     </div>

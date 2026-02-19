@@ -3,7 +3,6 @@
     <div class="row mb-4">
       <div class="col-12 d-flex justify-content-between align-items-center">
         <div>
-          <h1 class="fw-bold mb-0">مدیریت محصولات</h1>
           <p class="text-muted mt-1">مدیریت و مشاهده لیست محصولات سیستم</p>
           <div v-if="selectedTr.length > 0" class="mt-2">
             <small class="text-primary">
@@ -173,11 +172,11 @@
                 </td>
                 <td>
                   <div class="actionBTN btn-group btn-group-sm float-end">
-                    <button class="btn text-primary btn-sm" @click="viewProduct(product)" title="مشاهده">
+                    <button class="btn text-primary btn-sm" @click.stop="viewProduct(product)" title="مشاهده">
                       <i class="fa fa-eye"></i>
                     </button>
-                    <button class="btn text-warning btn-sm" @click="editProduct(product)" title="ویرایش">
-                      <i class="fa fa-pencil"></i>
+                    <button class="btn text-warning btn-sm" @click.stop="editProduct(product)" title="ویرایش">
+                      <i class="fa fa-edit"></i>
                     </button>
                     <button v-if="!product.deleted_at" class="btn text-danger btn-sm" @click="deleteProduct(product)"
                       title="حذف">
@@ -239,12 +238,13 @@
 import Swal from 'sweetalert2'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'windows',
   middleware: 'auth',
   title: 'مدیریت محصولات'
 })
 
 const { $api } = useNuxtApp()
+const { openPage } = useWindows()
 
 const products = ref([])
 const loading = ref(true)
@@ -506,11 +506,21 @@ const goToAdd = () => {
 }
 
 const viewProduct = (product) => {
-  navigateTo(`/dashboard/products/${product.id}`)
+  openPage(
+    `/dashboard/products/${product.id}`,
+    `مشاهده محصول: ${product.title}`,
+    'fa fa-eye',
+    `product_view_${product.id}`
+  )
 }
 
 const editProduct = (product) => {
-  navigateTo(`/dashboard/products/edit_${product.id}`)
+  openPage(
+    `/dashboard/products/edit_${product.id}`,
+    `ویرایش محصول: ${product.title}`,
+    'fa fa-edit',
+    `product_edit_${product.id}`
+  )
 }
 
 const deleteProduct = async (product) => {

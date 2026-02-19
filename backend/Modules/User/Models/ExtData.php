@@ -4,6 +4,7 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Modules\App\Models\App;
 
 class ExtData extends Model
 {
@@ -14,6 +15,7 @@ class ExtData extends Model
         'f_id',
         'm_id',
         's_id',
+        'app_id',
         'title',
         'kind',
         'datas',
@@ -51,5 +53,10 @@ class ExtData extends Model
     public function os()
     {
         return $this->belongsTo(Option::class, 's_id', 'id');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
     }
 }

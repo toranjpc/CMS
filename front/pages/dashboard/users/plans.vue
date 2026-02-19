@@ -1,617 +1,664 @@
 <template>
-  <div class="user-plans-page">
+  <div class="plans-page">
     <div class="row mb-4">
       <div class="col-12 d-flex justify-content-between align-items-center">
         <div>
-          <h1 class="fw-bold mb-0">پل‌های کاربری</h1>
-          <p class="text-muted mt-1">مدیریت پل‌ها و اشتراک‌های کاربران سیستم</p>
+          <h4 class="mb-0">مدیریت پلن‌ها</h4>
+          <p class="text-muted mt-1">مدیریت پلن‌های اشتراکی نرم‌افزار</p>
+          <div v-if="selectedTr.length > 0" class="mt-2">
+            <small class="text-primary">
+              <i class="fa fa-check-circle me-1"></i>
+              مجموع {{ selectedTr.length }} سطر انتخاب شده
+            </small>
+          </div>
         </div>
-        <button class="btn btn-primary" @click="showAddPlanModal = true">
-          <i class="bi bi-plus-circle me-1"></i>
-          افزودن پل
-        </button>
+        <div class="d-flex gap-2">
+          <button v-if="selectedTr.length > 0" class="btn btn-outline-danger btn-sm" @click="bulkDeleteSelected"
+            title="حذف گروهی">
+            <i class="fa fa-trash me-1"></i>
+            حذف گروهی ({{ selectedTr.length }})
+          </button>
+          <button class="btn btn-primary" @click="openPlanModal('create')">
+            <i class="fa fa-plus-circle me-1"></i>
+            افزودن پلن
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Search and Filter -->
-    <div class="card mb-4">
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <input
-              type="text"
-              class="form-control"
-              placeholder="جستجو بر اساس نام پل..."
-              v-model="searchQuery"
-            />
+    <!-- جستجو -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <form @submit.prevent="searchPlans" class="mb-0">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <input type="text" class="form-control" placeholder="جستجو بر اساس عنوان..."
+                    v-model="searchQuery.title" />
+                </div>
+                <div class="col-md-2">
+                  <select class="form-select" v-model="searchQuery.status">
+                    <option value="">همه وضعیت‌ها</option>
+                    <option value="1">فعال</option>
+                    <option value="0">غیرفعال</option>
+                    <option value="deleted">سطل زباله</option>
+                  </select>
+                </div>
+                <div class="col-md-2" v-if="searchQuery.title || searchQuery.status">
+                  <button type="submit" class="btn border-success text-success mx-1">
+                    <i class="fa fa-search"></i>
+                  </button>
+                  <button type="button" class="btn border-warning text-warning mx-1" @click="resetFilters">
+                    <i class="fa fa-times"></i>
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
-          <div class="col-md-2">
-            <select class="form-select" v-model="statusFilter">
-              <option value="">همه وضعیت‌ها</option>
-              <option value="active">فعال</option>
-              <option value="inactive">غیرفعال</option>
-            </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- جدول پلن‌ها -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body p-0">
+            <!-- Loading State -->
+            <div v-if="loading" class="text-center py-5">
+              <div class="spinner-border text-primary spinner-border-sm" role="status">
+                <span class="visually-hidden">در حال بارگذاری...</span>
+              </div>
+            </div>
+
+            <!-- Error State -->
+            <div v-else-if="error" class="alert alert-danger m-3" role="alert">
+              <i class="fa fa-exclamation-triangle me-2"></i>
+              {{ error }}
+              <button class="btn btn-sm btn-outline-danger ms-2" @click="getData()">
+                <i class="fa fa-arrow-clockwise"></i>
+                تلاش مجدد
+              </button>
+            </div>
+
+            <!-- Table -->
+            <div v-else class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th width="5%">شناسه</th>
+                    <th width="30%">عنوان</th>
+                    <th width="40%">گزینه‌ها</th>
+                    <th width="10%">وضعیت</th>
+                    <th width="15%">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(plan, index) in plans" :key="plan.id"
+                    :class="getRowClass(plan.id, index)" @click="setCurrentRow(index)">
+                    <td @click="toggleRowSelectionById(plan.id)">
+                      <input type="checkbox" v-if="selectedTr.includes(plan.id)" checked
+                        class="form-check-input me-2">
+                      <a href="javascript:;" v-else class="text-decoration-none">{{ plan.id }}</a>
+                    </td>
+                    <td>{{ plan.title }}</td>
+                    <td>
+                      <pre v-if="plan.option" class="mb-0 small">{{ JSON.stringify(plan.option, null, 2) }}</pre>
+                      <span v-else class="text-muted">-</span>
+                    </td>
+                    <td>
+                      <span :class="getStatusBadgeClass(plan.status)">
+                        {{ plan.status == 1 ? 'فعال' : 'غیرفعال' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="actionBTN btn-group btn-group-sm">
+                        <div v-if="plan.deleted_at">
+                          <button class="btn text-warning btn-sm" @click="openDeleteModal(plan, 'restore')"
+                            title="بازیافت">
+                            <i class="fa fa-refresh"></i>
+                          </button>
+                          <button class="btn text-danger btn-sm" @click="openDeleteModal(plan, 'delete')"
+                            title="حذف برای همیشه">
+                            <i class="fa fa-times"></i>
+                          </button>
+                        </div>
+                        <div v-else>
+                          <button class="btn text-primary btn-sm" @click="editPlan(plan)" title="ویرایش">
+                            <i class="fa fa-edit"></i>
+                          </button>
+                          <button class="btn text-danger btn-sm" @click="openDeleteModal(plan)" title="حذف">
+                            <i class="fa fa-times"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="plans.length === 0">
+                    <td colspan="5" class="text-center py-4 text-muted">
+                      <i class="fa fa-list fa-2x mb-2"></i>
+                      <div>هیچ پلنی یافت نشد</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="card-footer" v-if="totalItems > itemsPerPage">
+              <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                  <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                    <a class="page-link" href="javascript:;" @click="getData(currentPage - 1, getSearchParams())"
+                      v-if="currentPage > 1">قبلی</a>
+                  </li>
+                  <li class="page-item" :class="{ active: page === currentPage }" v-for="page in totalPages"
+                    :key="page">
+                    <a class="page-link" href="javascript:;" @click="getData(page, getSearchParams())">{{ page }}</a>
+                  </li>
+                  <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                    <a class="page-link" href="javascript:;" @click="getData(currentPage + 1, getSearchParams())"
+                      v-if="currentPage < totalPages">بعدی</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
           </div>
-          <div class="col-md-2">
-            <select class="form-select" v-model="typeFilter">
-              <option value="">همه انواع</option>
-              <option value="monthly">ماهانه</option>
-              <option value="yearly">سالانه</option>
-              <option value="lifetime">دائمی</option>
-            </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan Modal (Create/Edit) -->
+    <div class="modal fade" :class="{ show: showPlanModal }"
+      :style="{ display: showPlanModal ? 'block' : 'none' }" tabindex="-1">
+      <div class="shadow" @click="showPlanModal = false; currentPlan = null"></div>
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title">
+              <span v-if="modalMode === 'create'">افزودن پلن جدید</span>
+              <span v-else-if="modalMode === 'edit'">ویرایش پلن</span>
+            </h5>
+            <button type="button" class="btn-close" @click="showPlanModal = false; currentPlan = null"></button>
           </div>
-          <div class="col-md-2">
-            <select class="form-select" v-model="popularFilter">
-              <option value="">همه پل‌ها</option>
-              <option value="true">پل‌های محبوب</option>
-              <option value="false">پل‌های عادی</option>
-            </select>
+          <div class="modal-body">
+            <div class="card-title">
+              <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
+            </div>
+
+            <form @submit.prevent="savePlan" v-if="currentPlan" id="planForm">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">عنوان پلن *</label>
+                  <input type="text" class="form-control" v-model="currentPlan.title"
+                    ref="planTitleInput" required placeholder="مثال: اشتراک طلایی" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">گزینه‌ها (JSON)</label>
+                  <textarea rows="5" class="form-control" v-model="planOptionJson"
+                    placeholder='{"price": 1000000, "duration": 12, "features": ["feature1", "feature2"]}'></textarea>
+                  <small class="text-muted">گزینه‌های پلن به صورت JSON (اختیاری)</small>
+                </div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" v-model="currentPlan.status" :true-value="1"
+                      :false-value="0" id="planStatus">
+                    <label class="form-check-label" for="planStatus">
+                      فعال
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </form>
           </div>
-          <div class="col-md-2">
-            <button class="btn btn-outline-secondary w-100" @click="resetFilters">
-              پاک کردن فیلترها
+          <div class="modal-footer" v-if="formloading">
+            درحال بارگذاری ....
+            <div class="spinner-border btn btn-secondary" role="status"></div>
+          </div>
+          <div class="modal-footer" v-else>
+            <button type="button" class="btn btn-secondary"
+              @click="showPlanModal = false; currentPlan = null">انصراف</button>
+            <button type="submit" class="btn btn-primary" form="planForm" @click.prevent="savePlan">
+              <span v-if="modalMode === 'create'">افزودن پلن</span>
+              <span v-else-if="modalMode === 'edit'">به‌روزرسانی پلن</span>
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Plans Grid -->
-    <div class="row">
-      <div class="col-md-4 mb-4" v-for="plan in filteredPlans" :key="plan.id">
-        <div class="card h-100 plan-card" :class="{ 'plan-popular': plan.isPopular }">
-          <div class="card-header text-center" v-if="plan.isPopular">
-            <span class="badge bg-warning text-dark popular-badge">
-              <i class="bi bi-star-fill me-1"></i>
-              محبوب‌ترین
-            </span>
-          </div>
-          <div class="card-body d-flex flex-column">
-            <div class="text-center mb-3">
-              <h5 class="card-title fw-bold">{{ plan.name }}</h5>
-              <div class="plan-price mb-2">
-                <span class="price-amount">{{ formatPrice(plan.price) }}</span>
-                <span class="price-unit">{{ getPriceUnit(plan.type) }}</span>
-              </div>
-              <span class="badge" :class="getTypeBadgeClass(plan.type)">
-                {{ getTypeLabel(plan.type) }}
-              </span>
-            </div>
-
-            <p class="card-text text-muted text-center mb-3">{{ plan.description }}</p>
-
-            <div class="features-list mb-3">
-              <div class="feature-item" v-for="feature in plan.features.slice(0, 4)" :key="feature">
-                <i class="bi bi-check-circle-fill text-success me-2"></i>
-                {{ feature }}
-              </div>
-              <div v-if="plan.features.length > 4" class="feature-item text-muted">
-                <i class="bi bi-plus-circle me-2"></i>
-                و {{ plan.features.length - 4 }} امکان دیگر...
-              </div>
-            </div>
-
-            <div class="plan-stats mb-3">
-              <div class="row text-center">
-                <div class="col-6">
-                  <div class="stat-number">{{ plan.userCount }}</div>
-                  <small class="text-muted">کاربر</small>
-                </div>
-                <div class="col-6">
-                  <div class="stat-number">{{ plan.maxUsers || '∞' }}</div>
-                  <small class="text-muted">حداکثر</small>
-                </div>
-              </div>
-            </div>
-
-            <div class="plan-status mb-3">
-              <span class="badge w-100" :class="getStatusBadgeClass(plan.status)">
-                {{ getStatusLabel(plan.status) }}
-              </span>
-            </div>
-
-            <div class="mt-auto">
-              <div class="btn-group w-100">
-                <button class="btn btn-outline-primary btn-sm" @click="editPlan(plan)">
-                  <i class="bi bi-pencil me-1"></i>
-                  ویرایش
-                </button>
-                <button class="btn btn-outline-info btn-sm" @click="viewPlan(plan)">
-                  <i class="bi bi-eye me-1"></i>
-                  مشاهده
-                </button>
-                <button class="btn btn-outline-danger btn-sm" @click="deletePlan(plan)">
-                  <i class="bi bi-trash me-1"></i>
-                  حذف
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Plans Table View (Alternative) -->
-    <div class="card mt-4" v-if="viewMode === 'table'">
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-hover">
-            <thead>
-              <tr>
-                <th>نام پل</th>
-                <th>قیمت</th>
-                <th>نوع</th>
-                <th>کاربران</th>
-                <th>وضعیت</th>
-                <th>عملیات</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="plan in filteredPlans" :key="plan.id">
-                <td>
-                  <div class="d-flex align-items-center">
-                    <div v-if="plan.isPopular" class="popular-indicator me-2">
-                      <i class="bi bi-star-fill text-warning"></i>
-                    </div>
-                    <div>
-                      <div class="fw-semibold">{{ plan.name }}</div>
-                      <small class="text-muted">{{ plan.description }}</small>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div class="fw-semibold">{{ formatPrice(plan.price) }}</div>
-                  <small class="text-muted">{{ getPriceUnit(plan.type) }}</small>
-                </td>
-                <td>
-                  <span class="badge" :class="getTypeBadgeClass(plan.type)">
-                    {{ getTypeLabel(plan.type) }}
-                  </span>
-                </td>
-                <td>{{ plan.userCount }} / {{ plan.maxUsers || '∞' }}</td>
-                <td>
-                  <span class="badge" :class="getStatusBadgeClass(plan.status)">
-                    {{ getStatusLabel(plan.status) }}
-                  </span>
-                </td>
-                <td>
-                  <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary" @click="editPlan(plan)" title="ویرایش">
-                      <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-outline-info" @click="viewPlan(plan)" title="مشاهده">
-                      <i class="bi bi-eye"></i>
-                    </button>
-                    <button class="btn btn-outline-danger" @click="deletePlan(plan)" title="حذف">
-                      <i class="bi bi-trash"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- View Toggle -->
-    <div class="d-flex justify-content-end mt-3">
-      <div class="btn-group btn-group-sm">
-        <button class="btn btn-outline-secondary" :class="{ active: viewMode === 'grid' }" @click="viewMode = 'grid'">
-          <i class="bi bi-grid"></i>
-        </button>
-        <button class="btn btn-outline-secondary" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'">
-          <i class="bi bi-list"></i>
-        </button>
-      </div>
-    </div>
-
-    <!-- Add Plan Modal -->
-    <div class="modal fade" :class="{ show: showAddPlanModal }" :style="{ display: showAddPlanModal ? 'block' : 'none' }" tabindex="-1">
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">افزودن پل جدید</h5>
-            <button type="button" class="btn-close" @click="showAddPlanModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <form @submit.prevent="addPlan">
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label">نام پل *</label>
-                  <input type="text" class="form-control" v-model="newPlan.name" required />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">نوع پل</label>
-                  <select class="form-select" v-model="newPlan.type">
-                    <option value="monthly">ماهانه</option>
-                    <option value="yearly">سالانه</option>
-                    <option value="lifetime">دائمی</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">قیمت (تومان)</label>
-                  <input type="number" class="form-control" v-model="newPlan.price" min="0" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">حداکثر کاربران (اختیاری)</label>
-                  <input type="number" class="form-control" v-model="newPlan.maxUsers" min="0" placeholder="بی‌نهایت" />
-                </div>
-                <div class="col-12">
-                  <label class="form-label">توضیحات</label>
-                  <textarea class="form-control" rows="3" v-model="newPlan.description"></textarea>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">وضعیت</label>
-                  <select class="form-select" v-model="newPlan.status">
-                    <option value="active">فعال</option>
-                    <option value="inactive">غیرفعال</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">پل محبوب</label>
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" v-model="newPlan.isPopular" />
-                    <label class="form-check-label">این پل را به عنوان محبوب نمایش بده</label>
-                  </div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">امکانات پل</label>
-                  <div class="features-input">
-                    <div class="input-group mb-2" v-for="(feature, index) in newPlan.features" :key="index">
-                      <input type="text" class="form-control" v-model="newPlan.features[index]" placeholder="مثال: دسترسی به API" />
-                      <button class="btn btn-outline-danger" type="button" @click="removeFeature(index)">
-                        <i class="bi bi-x"></i>
-                      </button>
-                    </div>
-                    <button class="btn btn-outline-primary btn-sm" type="button" @click="addFeature">
-                      <i class="bi bi-plus me-1"></i>
-                      افزودن امکان
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showAddPlanModal = false">انصراف</button>
-            <button type="button" class="btn btn-primary" @click="addPlan">افزودن پل</button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
+import Swal from 'sweetalert2'
 
-// Reactive data
-const searchQuery = ref('')
-const statusFilter = ref('')
-const typeFilter = ref('')
-const popularFilter = ref('')
-const viewMode = ref('grid')
-const showAddPlanModal = ref(false)
+definePageMeta({
+  layout: 'windows',
+  middleware: 'auth',
+  title: 'مدیریت پلن‌ها'
+})
+const { $api } = useNuxtApp()
 
-const newPlan = reactive({
-  name: '',
-  description: '',
-  price: 0,
-  type: 'monthly',
-  maxUsers: null,
-  status: 'active',
-  isPopular: false,
-  features: ['']
+// داده‌های پلن
+const plans = ref([])
+
+// وضعیت بارگذاری
+const loading = ref(false)
+
+// خطا
+const error = ref(null)
+
+// pagination
+const totalItems = ref(0)
+const totalPages = ref(0)
+const currentPage = ref(1)
+
+const itemsPerPage = ref(10)
+
+// جستجو
+const searchQuery = ref({
+  title: '',
+  status: ''
 })
 
-// Mock plans data
-const plans = ref([
-  {
-    id: 1,
-    name: 'پل رایگان',
-    description: 'پل پایه برای شروع',
-    price: 0,
-    type: 'lifetime',
-    maxUsers: 1,
-    status: 'active',
-    isPopular: false,
-    userCount: 245,
-    features: [
-      'دسترسی به پنل کاربری',
-      '۵ صفحه محتوا',
-      'پشتیبانی ایمیلی',
-      'آمار پایه'
-    ]
-  },
-  {
-    id: 2,
-    name: 'پل استاندارد',
-    description: 'مناسب برای کسب‌وکارهای کوچک',
-    price: 290000,
-    type: 'monthly',
-    maxUsers: 10,
-    status: 'active',
-    isPopular: false,
-    userCount: 89,
-    features: [
-      'تمام امکانات رایگان',
-      '۵۰ صفحه محتوا',
-      'پشتیبانی چت آنلاین',
-      'آمار پیشرفته',
-      'API دسترسی',
-      'بکاپ روزانه'
-    ]
-  },
-  {
-    id: 3,
-    name: 'پل حرفه‌ای',
-    description: 'برای کسب‌وکارهای در حال رشد',
-    price: 590000,
-    type: 'monthly',
-    maxUsers: 50,
-    status: 'active',
-    isPopular: true,
-    userCount: 156,
-    features: [
-      'تمام امکانات استاندارد',
-      'صفحات نامحدود',
-      'پشتیبانی تلفنی',
-      'گزارشات تحلیلی',
-      'چند کاربره',
-      'دامنه اختصاصی',
-      'SSL رایگان'
-    ]
-  },
-  {
-    id: 4,
-    name: 'پل سازمانی',
-    description: 'راه‌حل کامل برای سازمان‌ها',
-    price: 2500000,
-    type: 'yearly',
-    maxUsers: null,
-    status: 'active',
-    isPopular: false,
-    userCount: 23,
-    features: [
-      'تمام امکانات حرفه‌ای',
-      'کاربران نامحدود',
-      'پشتیبانی اختصاصی',
-      'مشاوره رایگان',
-      'آموزش تیم',
-      'API پیشرفته',
-      'شخصی‌سازی کامل'
-    ]
-  },
-  {
-    id: 5,
-    name: 'پل سالانه',
-    description: 'تخفیف ویژه اشتراک سالانه',
-    price: 1990000,
-    type: 'yearly',
-    maxUsers: 25,
-    status: 'inactive',
-    isPopular: false,
-    userCount: 0,
-    features: [
-      'تمام امکانات حرفه‌ای',
-      'تخفیف ۵۰ درصدی',
-      'پشتیبانی اولویت‌دار',
-      'آمار پیشرفته'
-    ]
+// انتخاب سطرها
+const selectedTr = ref([])
+
+// شاخص سطر فعلی
+const currentRowIndex = ref(-1)
+
+const formloading = ref(false)
+const formError = ref(null)
+
+const showPlanModal = ref(false)
+const modalMode = ref('create') /* 'create', 'edit' */
+const currentPlan = ref(null)
+const planTitleInput = ref(null)
+const planOptionJson = ref('')
+
+// تابع بارگذاری داده‌ها
+const getData = async (page = 1, searchParams = {}) => {
+  loading.value = true
+  error.value = null
+
+  try {
+    const payload = {
+      limit: itemsPerPage.value,
+      page: page
+    }
+    
+    if (searchParams.title && searchParams.title.trim()) payload.title = searchParams.title
+    if (searchParams.status) payload.status = searchParams.status
+
+    const response = await $api('/users/plans/list', {
+      method: 'POST',
+      body: payload
+    })
+    console.log('API Response:', response)
+
+    const data = response?.items || {}
+    plans.value = data.data || []
+    totalItems.value = data.total || 0
+    totalPages.value = data.last_page || 0
+    currentPage.value = data.current_page || page || 1
+
+    selectedTr.value = []
+    currentRowIndex.value = -1
+
+  } catch (err) {
+    console.error('Error loading plans:', err)
+    console.error('Error details:', err.response?.data || err.message)
+    error.value = 'خطا در بارگذاری لیست پلن‌ها'
+    plans.value = []
+    totalItems.value = 0
+    totalPages.value = 0
+    currentPage.value = 1
+  } finally {
+    loading.value = false
   }
-])
-
-// Computed properties
-const filteredPlans = computed(() => {
-  let filtered = plans.value
-
-  if (searchQuery.value) {
-    filtered = filtered.filter(plan =>
-      plan.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      plan.description.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-  }
-
-  if (statusFilter.value) {
-    filtered = filtered.filter(plan => plan.status === statusFilter.value)
-  }
-
-  if (typeFilter.value) {
-    filtered = filtered.filter(plan => plan.type === typeFilter.value)
-  }
-
-  if (popularFilter.value !== '') {
-    const isPopular = popularFilter.value === 'true'
-    filtered = filtered.filter(plan => plan.isPopular === isPopular)
-  }
-
-  return filtered
-})
-
-// Methods
-const formatPrice = (price) => {
-  if (price === 0) return 'رایگان'
-  return new Intl.NumberFormat('fa-IR').format(price)
 }
 
-const getPriceUnit = (type) => {
-  const units = {
-    monthly: 'تومان/ماه',
-    yearly: 'تومان/سال',
-    lifetime: 'یکبار پرداخت'
+// تابع انتخاب سطر
+const toggleRowSelectionById = (planId) => {
+  const index = selectedTr.value.indexOf(planId)
+  if (index > -1) {
+    selectedTr.value.splice(index, 1)
+  } else {
+    selectedTr.value.push(planId)
   }
-  return units[type] || ''
 }
 
-const getTypeLabel = (type) => {
-  const labels = {
-    monthly: 'ماهانه',
-    yearly: 'سالانه',
-    lifetime: 'دائمی'
-  }
-  return labels[type] || type
+const getRowClass = (planId, index) => {
+  const classes = []
+  if (selectedTr.value.includes(planId)) classes.push('selected')
+  if (index === currentRowIndex.value) classes.push('current-row')
+  return classes.join(' ')
 }
 
-const getTypeBadgeClass = (type) => {
-  const classes = {
-    monthly: 'bg-primary',
-    yearly: 'bg-success',
-    lifetime: 'bg-info'
-  }
-  return classes[type] || 'bg-secondary'
-}
-
-const getStatusLabel = (status) => {
-  const labels = {
-    active: 'فعال',
-    inactive: 'غیرفعال'
-  }
-  return labels[status] || status
+const setCurrentRow = (rowIndex) => {
+  currentRowIndex.value = rowIndex
 }
 
 const getStatusBadgeClass = (status) => {
-  const classes = {
-    active: 'bg-success',
-    inactive: 'bg-secondary'
+  return status == 1 ? 'badge bg-success' : 'badge bg-secondary'
+}
+
+const searchPlans = () => {
+  const params = {
+    title: searchQuery.value.title,
+    status: searchQuery.value.status
   }
-  return classes[status] || 'bg-secondary'
+  getData(currentPage.value, params)
 }
 
 const resetFilters = () => {
-  searchQuery.value = ''
-  statusFilter.value = ''
-  typeFilter.value = ''
-  popularFilter.value = ''
+  searchQuery.value = {
+    title: '',
+    status: ''
+  }
+  selectedTr.value = []
+  currentRowIndex.value = -1
+  getData(currentPage.value)
 }
 
-const addFeature = () => {
-  newPlan.features.push('')
+// تابع برای گرفتن پارامترهای جستجوی فعلی
+const getSearchParams = () => {
+  if (searchQuery.value && (searchQuery.value.title || searchQuery.value.status)) {
+    return {
+      title: searchQuery.value.title,
+      status: searchQuery.value.status
+    }
+  }
+  return {}
 }
 
-const removeFeature = (index) => {
-  newPlan.features.splice(index, 1)
-}
-
-const addPlan = () => {
-  if (!newPlan.name.trim()) return
-
-  // Filter out empty features
-  const cleanFeatures = newPlan.features.filter(feature => feature.trim() !== '')
-
-  const plan = {
-    id: plans.value.length + 1,
-    ...newPlan,
-    features: cleanFeatures,
-    userCount: 0
+const savePlan = async () => {
+  if (!currentPlan.value.title?.trim()) {
+    formError.value = 'عنوان پلن الزامی است'
+    return
   }
 
-  plans.value.push(plan)
+  formloading.value = true
+  formError.value = null
 
-  // Reset form
-  Object.assign(newPlan, {
-    name: '',
-    description: '',
-    price: 0,
-    type: 'monthly',
-    maxUsers: null,
-    status: 'active',
-    isPopular: false,
-    features: ['']
-  })
+  try {
+    let optionData = {}
+    if (planOptionJson.value.trim()) {
+      try {
+        optionData = JSON.parse(planOptionJson.value)
+      } catch (e) {
+        formError.value = 'فرمت JSON گزینه‌ها نامعتبر است'
+        formloading.value = false
+        return
+      }
+    }
 
-  showAddPlanModal.value = false
-  alert('پل با موفقیت اضافه شد!')
+    const payload = {
+      title: currentPlan.value.title.trim(),
+      option: optionData,
+      status: currentPlan.value.status ?? 1,
+    }
+
+    let response
+    if (modalMode.value === 'create') {
+      response = await $api('/users/plans', {
+        method: 'POST',
+        body: payload
+      })
+
+      if (response?.data) {
+        await getData()
+      }
+    } else if (modalMode.value === 'edit') {
+      response = await $api(`/users/plans/${currentPlan.value.id}`, {
+        method: 'PUT',
+        body: payload
+      })
+
+      if (response?.data) {
+        await getData()
+      }
+    }
+
+    showPlanModal.value = false
+    currentPlan.value = null
+    planOptionJson.value = ''
+
+  } catch (err) {
+    const status = err?.response?.status
+    const data = err?.response?._data
+
+    if (status === 422 && data?.errors) {
+      formError.value = Object.values(data.errors)
+        .flat()
+        .join(' ، ')
+    }
+    else if (data?.message) {
+      formError.value = data.message
+    }
+    else {
+      formError.value = 'خطایی در ارتباط با سرور رخ داد'
+    }
+  } finally {
+    formloading.value = false
+  }
+}
+
+const openPlanModal = async (mode = 'create', plan = null) => {
+  modalMode.value = mode
+  formError.value = null
+
+  if (mode === 'create') {
+    currentPlan.value = {
+      title: '',
+      status: 1
+    }
+    planOptionJson.value = ''
+  } else if (plan) {
+    currentPlan.value = {
+      id: plan.id,
+      title: plan.title,
+      status: plan.status ?? 1
+    }
+    planOptionJson.value = plan.option ? JSON.stringify(plan.option, null, 2) : ''
+  }
+
+  showPlanModal.value = true
+
+  await nextTick()
+  if (planTitleInput.value) {
+    planTitleInput.value.focus()
+  }
 }
 
 const editPlan = (plan) => {
-  alert(`ویرایش پل: ${plan.name}`)
+  openPlanModal('edit', plan)
 }
 
-const viewPlan = (plan) => {
-  alert(`مشاهده پل: ${plan.name}`)
+// حذف گروهی
+const bulkDeleteSelected = async () => {
+  if (selectedTr.value.length === 0) return
+
+  const result = await Swal.fire({
+    title: 'تأیید حذف گروهی',
+    text: `آیا مطمئن هستید که می‌خواهید ${selectedTr.value.length} پلن انتخاب شده را حذف کنید؟`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'بله، حذف کن',
+    cancelButtonText: 'لغو',
+    reverseButtons: true,
+    customClass: {
+      popup: 'swal-rtl'
+    }
+  })
+
+  if (!result.isConfirmed) return
+
+  formloading.value = true
+  let successCount = 0
+  let errorCount = 0
+
+  for (const planId of selectedTr.value) {
+    try {
+      await $api(`/users/plans/${planId}`, {
+        method: 'DELETE'
+      })
+      successCount++
+    } catch (err) {
+      console.error(`Error deleting plan ${planId}:`, err)
+      errorCount++
+    }
+  }
+
+  selectedTr.value = []
+  await getData()
+
+  if (errorCount === 0) {
+    await Swal.fire({
+      title: 'انجام شد!',
+      text: `${successCount} پلن با موفقیت حذف شد.`,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  } else {
+    await Swal.fire({
+      title: 'عملیات نیمه کامل',
+      text: `${successCount} پلن حذف شد. ${errorCount} پلن با خطا مواجه شد.`,
+      icon: 'warning',
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  }
+
+  formloading.value = false
 }
 
-const deletePlan = (plan) => {
-  if (confirm(`آیا از حذف پل "${plan.name}" اطمینان دارید؟`)) {
-    plans.value = plans.value.filter(p => p.id !== plan.id)
+const openDeleteModal = async (plan, method = '') => {
+  let title, text, icon, confirmButtonText, confirmButtonColor
+
+  if (method === 'restore') {
+    title = 'بازیابی پلن'
+    text = `آیا می‌خواهید پلن "${plan.title}" را بازیابی کنید؟`
+    icon = 'question'
+    confirmButtonText = 'بله، بازیابی کن'
+    confirmButtonColor = '#28a745'
+  } else if (method === 'delete') {
+    title = 'حذف کامل پلن'
+    text = `آیا مطمئن هستید که می‌خواهید پلن "${plan.title}" را برای همیشه حذف کنید؟ این عمل قابل برگشت نیست!`
+    icon = 'error'
+    confirmButtonText = 'بله، برای همیشه حذف کن'
+    confirmButtonColor = '#dc3545'
+  } else {
+    title = 'حذف پلن'
+    text = `آیا می‌خواهید پلن "${plan.title}" را حذف کنید؟`
+    icon = 'warning'
+    confirmButtonText = 'بله، حذف کن'
+    confirmButtonColor = '#dc3545'
+  }
+
+  const result = await Swal.fire({
+    title,
+    text,
+    icon,
+    showCancelButton: true,
+    confirmButtonColor,
+    cancelButtonColor: '#6c757d',
+    confirmButtonText,
+    cancelButtonText: 'لغو',
+    reverseButtons: true,
+    customClass: {
+      popup: 'swal-rtl'
+    }
+  })
+
+  if (result.isConfirmed) {
+    await confirmDelete(plan, method)
   }
 }
 
-definePageMeta({
-  layout: 'dashboard',
-  middleware: 'auth',
-  title: 'پل‌های کاربری - CMS Panel'
+const confirmDelete = async (plan, method = '') => {
+  formloading.value = true
+  error.value = null
+
+  try {
+    let url, httpMethod
+
+    if (method === 'restore') {
+      url = `/users/plans/${plan.id}/restore`
+      httpMethod = 'PATCH'
+    } else if (method === 'delete') {
+      url = `/users/plans/${plan.id}/force`
+      httpMethod = 'DELETE'
+    } else {
+      url = `/users/plans/${plan.id}`
+      httpMethod = 'DELETE'
+    }
+
+    await $api(url, {
+      method: httpMethod
+    })
+
+    await getData()
+
+  } catch (err) {
+    console.error('Error deleting plan:', err)
+    const status = err?.response?.status
+    const data = err?.response?._data
+    let errorMessage = 'خطا در عملیات'
+
+    if (status === 404) {
+      errorMessage = 'پلن یافت نشد'
+    } else if (status === 403) {
+      errorMessage = 'شما دسترسی انجام این عملیات را ندارید'
+    } else if (data?.message) {
+      errorMessage = data.message
+    }
+
+    await Swal.fire({
+      title: 'خطا!',
+      text: errorMessage,
+      icon: 'error',
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+  } finally {
+    formloading.value = false
+  }
+}
+
+onMounted(() => {
+  getData()
 })
+
 </script>
 
 <style scoped>
-.plan-card {
-  transition: transform 0.2s, box-shadow 0.2s;
-  border: 2px solid transparent;
+.plans-page .selected {
+  background-color: #e3f2fd !important;
 }
 
-.plan-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+.plans-page .current-row {
+  background-color: #fff3cd !important;
 }
 
-.plan-popular {
-  border-color: #ffc107;
-  position: relative;
+.actionBTN {
+  white-space: nowrap;
 }
 
-.plan-price {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #0d6efd;
-  margin-bottom: 0.5rem;
-}
-
-.price-amount {
-  font-size: 2rem;
-}
-
-.price-unit {
-  font-size: 0.8rem;
-  color: #6c757d;
-}
-
-.popular-badge {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.8rem;
-}
-
-.features-list {
-  flex-grow: 1;
-}
-
-.feature-item {
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-}
-
-.plan-stats {
-  border-top: 1px solid #dee2e6;
-  border-bottom: 1px solid #dee2e6;
-  padding: 1rem 0;
-  margin: 1rem 0;
-}
-
-.stat-number {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #0d6efd;
-}
-
-.popular-indicator {
-  font-size: 1.2rem;
-}
-
-.table th {
-  font-weight: 600;
-  border-bottom: 2px solid #dee2e6;
+pre {
+  font-size: 0.75rem;
+  max-height: 100px;
+  overflow-y: auto;
 }
 </style>
+

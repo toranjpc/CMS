@@ -1,7 +1,6 @@
 <template>
   <Loading v-if="pageLoading" />
   <div v-else>
-    <h2 class="text-center">فاکتور خرید</h2>
     <div v-if="isViewingFromList" class="alert alert-info py-2">
       حالت نمایش فعال است و امکان ویرایش وجود ندارد.
     </div>

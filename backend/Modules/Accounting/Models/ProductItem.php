@@ -5,6 +5,7 @@ namespace Modules\Accounting\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Modules\User\Models\ExtData;
+use Modules\App\Models\App;
 
 class ProductItem extends Model
 {
@@ -12,6 +13,7 @@ class ProductItem extends Model
 
     protected $fillable = [
         'user_id',
+        'app_id',
         'f_id',
         'title',
         'firstWarehouse',
@@ -115,5 +117,10 @@ class ProductItem extends Model
     {
         return $this->belongsTo(ProductOption::class, 'selectConvertUnit', 'id')
             ->where('kind', 'unit');
+    }
+
+    public function app()
+    {
+        return $this->belongsTo(App::class);
     }
 }

@@ -42,7 +42,8 @@ class ProductOptionObserver
             [
                 'old' => $old,
                 'new' => $new
-            ]
+            ],
+            $model->app_id ?? null
         );
     }
 }

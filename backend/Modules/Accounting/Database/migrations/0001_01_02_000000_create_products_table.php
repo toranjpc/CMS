@@ -68,7 +68,7 @@ return new class extends Migration
             $table->text('des')->nullable();
             $table->json('option')->nullable();
 
-            $table->enum('kind', ['category', 'option', 'brand', 'unit', 'warehouse'])->nullable();
+            $table->enum('kind', ['category', 'option', 'brand', 'unit', 'warehouse','bank'])->nullable();
             $table->unique(['title', 'f_id', 'kind']);
 
             $table->tinyInteger('status')->default(0);

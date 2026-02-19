@@ -3,7 +3,6 @@
     <div class="row mb-4">
       <div class="col-12 d-flex justify-content-between align-items-center">
         <div>
-          <h1 class="fw-bold mb-0">انبارها</h1>
           <p class="text-muted mt-1">مدیریت انبارها</p>
           <div v-if="selectedTr.length > 0" class="mt-2">
             <small class="text-primary">
@@ -121,7 +120,7 @@
                         </div>
                         <div v-else>
                           <button class="btn text-primary btn-sm" @click="editwarehouse(warehouse)" title="ویرایش">
-                            <i class="fa fa-pencil"></i>
+                            <i class="fa fa-edit"></i>
                           </button>
                           <button class="btn text-danger btn-sm" @click="openDeleteModal(warehouse)" title="حذف">
                             <i class="fa fa-times"></i>
