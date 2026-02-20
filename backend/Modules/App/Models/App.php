@@ -18,6 +18,7 @@ class App extends Model
         "sett",
         "status",
         "expiry_date",
+        "app_id",
     ];
     protected $casts = [
         'sett' => 'array',
@@ -27,5 +28,15 @@ class App extends Model
     public function admin()
     {
         return $this->belongsTo(User::class, 'uid', 'id')->select('id', 'name', 'lastname');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(App::class, 'app_id');
+    }
+
+    public function branches()
+    {
+        return $this->hasMany(App::class, 'app_id');
     }
 }

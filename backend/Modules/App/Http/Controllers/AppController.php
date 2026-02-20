@@ -16,7 +16,7 @@ class AppController extends Controller
     public function index(Request $request)
     {
         try {
-            $apps = App::with(['admin:id,name,lastname'])
+            $apps = App::with(['admin:id,name,lastname', 'parent:id,title,url'])
                 ->when($request->input('title'), function ($q) use ($request) {
                     $q->where('title', 'LIKE', '%' . $request->input('title') . '%');
                 })
@@ -28,6 +28,23 @@ class AppController extends Controller
                 })
                 ->when($request->input('status') && $request->input('status') != 'deleted', function ($q) use ($request) {
                     $q->where('status', $request->input('status'));
+                })
+                ->when($request->input('app_id') !== null, function ($q) use ($request) {
+                    if ($request->input('app_id') === '0' || $request->input('app_id') === '') {
+                        // فقط اکانت‌های اصلی (بدون شعبه)
+                        $q->whereNull('app_id');
+                    } else {
+                        // شعبه‌های یک اکانت خاص
+                        $q->where('app_id', $request->input('app_id'));
+                    }
+                })
+                ->when($request->input('is_branch') === '1', function ($q) {
+                    // فقط شعبه‌ها
+                    $q->whereNotNull('app_id');
+                })
+                ->when($request->input('is_branch') === '0', function ($q) {
+                    // فقط اکانت‌های اصلی
+                    $q->whereNull('app_id');
                 })
                 ->orderByDesc('id')
                 ->paginate($request->input('limit', 10));
@@ -74,7 +91,7 @@ class AppController extends Controller
     public function show($id)
     {
         try {
-            $app = App::with(['admin:id,name,lastname'])->findOrFail($id);
+            $app = App::with(['admin:id,name,lastname', 'parent:id,title,url', 'branches:id,title,url,app_id'])->findOrFail($id);
             
             // Get plan
             $plan = ExtData::where('f_id', $app->id)
@@ -111,6 +128,7 @@ class AppController extends Controller
                 'plan_id' => 'nullable|exists:options,id',
                 'expiry_date' => 'nullable|date',
                 'status' => 'nullable|integer|in:0,1',
+                'app_id' => 'nullable|exists:apps,id',
             ], [
                 'uid.required' => 'انتخاب کاربر الزامی است',
                 'uid.exists' => 'کاربر انتخاب شده معتبر نیست',
@@ -119,7 +137,19 @@ class AppController extends Controller
                 'title.required' => 'نام شرکت/مغازه الزامی است',
                 'plan_id.exists' => 'پلن انتخاب شده معتبر نیست',
                 'expiry_date.date' => 'تاریخ اعتبار باید معتبر باشد',
+                'app_id.exists' => 'اکانت اصلی انتخاب شده معتبر نیست',
             ]);
+
+            // اگر app_id مشخص شده، بررسی کنیم که خودش شعبه نباشد
+            if (!empty($data['app_id'])) {
+                $parentApp = App::find($data['app_id']);
+                if ($parentApp && $parentApp->app_id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'نمی‌توان برای یک شعبه، شعبه دیگر ایجاد کرد'
+                    ], 422);
+                }
+            }
 
             $app = App::create([
                 'uid' => $data['uid'],
@@ -127,6 +157,7 @@ class AppController extends Controller
                 'title' => $data['title'],
                 'status' => $data['status'] ?? 1,
                 'expiry_date' => $data['expiry_date'] ?? null,
+                'app_id' => $data['app_id'] ?? null,
             ]);
 
             // Attach plan if provided
@@ -173,12 +204,31 @@ class AppController extends Controller
                 'plan_id' => 'nullable|exists:options,id',
                 'expiry_date' => 'nullable|date',
                 'status' => 'nullable|integer|in:0,1',
+                'app_id' => 'nullable|exists:apps,id',
             ], [
                 'uid.exists' => 'کاربر انتخاب شده معتبر نیست',
                 'url.unique' => 'این دامنه قبلاً ثبت شده است',
                 'plan_id.exists' => 'پلن انتخاب شده معتبر نیست',
                 'expiry_date.date' => 'تاریخ اعتبار باید معتبر باشد',
+                'app_id.exists' => 'اکانت اصلی انتخاب شده معتبر نیست',
             ]);
+
+            // اگر app_id مشخص شده، بررسی کنیم که خودش شعبه نباشد و همچنین خودش نباشد
+            if (isset($data['app_id']) && $data['app_id'] !== null) {
+                if ($data['app_id'] == $app->id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'یک اکانت نمی‌تواند شعبه خودش باشد'
+                    ], 422);
+                }
+                $parentApp = App::find($data['app_id']);
+                if ($parentApp && $parentApp->app_id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'نمی‌توان برای یک شعبه، شعبه دیگر ایجاد کرد'
+                    ], 422);
+                }
+            }
 
             $app->update(array_filter([
                 'uid' => $data['uid'] ?? null,
@@ -186,6 +236,7 @@ class AppController extends Controller
                 'title' => $data['title'] ?? null,
                 'status' => $data['status'] ?? null,
                 'expiry_date' => $data['expiry_date'] ?? null,
+                'app_id' => $data['app_id'] ?? null,
             ], fn($value) => $value !== null));
 
             // Update plan
