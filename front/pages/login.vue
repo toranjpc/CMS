@@ -67,7 +67,7 @@
 
                 <!-- Links -->
                 <div class="text-center">
-                  <p class="mb-0">
+                  <p class="mb-0" hidden>
                     حساب کاربری ندارید؟
                     <NuxtLink to="/register" class="text-primary text-decoration-none">
                       ثبت نام کنید
@@ -78,21 +78,7 @@
             </div>
           </div>
 
-          <!-- Demo Credentials -->
-          <div class="card mt-3 border-warning">
-            <div class="card-body">
-              <h6 class="card-title text-warning">
-                <i class="bi bi-info-circle me-1"></i>
-                اطلاعات آزمایشی
-              </h6>
-              <p class="card-text small mb-1">
-                <strong>موبایل:</strong> {{ testdata.mobile }}
-              </p>
-              <p class="card-text small mb-0">
-                <strong>رمز عبور:</strong> {{ testdata.pass }}
-              </p>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>
@@ -193,29 +179,6 @@ const handleLogin = async () => {
   }
 }
 
-
-
-const testdata = reactive({
-  mobile: '',
-  pass: '',
-})
-const config = useRuntimeConfig()
-onMounted(async () => {
-
-
-  const res = await $fetch(config.public.apiBase + "test", {
-    method: 'get',
-    headers: {
-      'Accept': 'application/json'
-    },
-    // body: {
-
-    // }
-  })
-  testdata.mobile = res.mobile
-  //console.log(res)
-
-})
 
 
 

@@ -13,3 +13,8 @@ Route::prefix('apps')->middleware('auth:sanctum')->name('apps.')->group(function
     Route::patch('{id}/restore', [AppController::class, 'restore'])->name('restore');
     Route::delete('{id}/force', [AppController::class, 'forceDestroy'])->name('force_destroy');
 });
+
+Route::prefix('branches')->middleware('auth:sanctum')->name('branches.')->group(function () {
+    Route::get('/', [AppController::class, 'branches'])->name('index');
+    Route::post('/list', [AppController::class, 'branches'])->name('indexSearch');
+});

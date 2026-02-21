@@ -153,6 +153,13 @@ function createWindowsInstance() {
       route: '/dashboard/plans',
       type: 'page',
       parent: 'system'
+    },
+    branch_list: {
+      title: 'مدیریت شعب',
+      icon: 'fa fa-list-alt',
+      route: '/dashboard/branches',
+      type: 'page',
+      parent: 'system'
     }
   }
 
@@ -179,7 +186,7 @@ function createWindowsInstance() {
       type: 'page',
       parent: 'users'
     },
-     products_add: {
+    products_add: {
       title: 'ایجاد محصول جدید',
       icon: 'fa fa-plus',
       route: '/dashboard/products/add',

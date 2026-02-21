@@ -325,4 +325,66 @@ class AppController extends Controller
             ], 500);
         }
     }
+
+    public function branches(Request $request)
+    {
+        try {
+            $branches = App::with(['admin:id,name,lastname', 'parent:id,title,url'])
+                ->whereNotNull('app_id')
+                ->when($request->input('title'), function ($q) use ($request) {
+                    $q->where('title', 'LIKE', '%' . $request->input('title') . '%');
+                })
+                ->when($request->input('url'), function ($q) use ($request) {
+                    $q->where('url', 'LIKE', '%' . $request->input('url') . '%');
+                })
+                ->when($request->input('app_id'), function ($q) use ($request) {
+                    $q->where('app_id', $request->input('app_id'));
+                })
+                ->when($request->input('status') && $request->input('status') == 'deleted', function ($q) {
+                    $q->onlyTrashed();
+                })
+                ->when($request->input('status') && $request->input('status') != 'deleted', function ($q) use ($request) {
+                    $q->where('status', $request->input('status'));
+                })
+                ->orderByDesc('id')
+                ->paginate($request->input('limit', 10));
+
+            // Get plans for each branch
+            $branchIds = $branches->pluck('id')->toArray();
+            $branchPlans = collect();
+            
+            if (!empty($branchIds)) {
+                $branchPlans = ExtData::whereIn('f_id', $branchIds)
+                    ->where('kind', 'AppPlan')
+                    ->with('om:id,title')
+                    ->get()
+                    ->groupBy('f_id');
+            }
+
+            // Get expiry dates
+            $branches->getCollection()->transform(function ($branch) use ($branchPlans) {
+                $plan = $branchPlans->get($branch->id)?->first();
+                $branch->plan = $plan?->om ?? null;
+                return $branch;
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'items' => $branches
+            ], 200);
+        } catch (\Throwable $th) {
+            Log::error('AppController@branches error', [
+                'message' => $th->getMessage(),
+                'file' => $th->getFile(),
+                'line' => $th->getLine(),
+                'trace' => $th->getTraceAsString()
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => $th->getMessage(),
+                'file' => $th->getFile(),
+                'line' => $th->getLine()
+            ], 500);
+        }
+    }
 }
