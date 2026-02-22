@@ -209,8 +209,10 @@ function createAuthInstance() {
 
   // Check if user has specific permission
   const hasPermission = (permission: string): boolean => {
-    if (!authState.value.user?.permissions) return false
-    return authState.value.user.permissions.includes(permission)
+    const per = authState.value.user?.per
+    if (!Array.isArray(per)) return false
+    if (per.includes('*')) return true
+    return per.includes(permission)
   }
 
   // Check if user has specific role

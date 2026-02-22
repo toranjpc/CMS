@@ -10,8 +10,8 @@ use Modules\Accounting\Http\Controllers\TransactionController;
 
 Route::prefix('products')
     ->name('products.')
-    ->middleware(['api', 'checkPermission'])
-    ->group(function () { //'auth:sanctum', 
+    ->middleware(['api', 'auth:sanctum', 'checkPermission'])
+    ->group(function () {
 
         Route::prefix('features')->name('features.')->group(function () {
             Route::get('/', [ProductController::class, 'feature_index'])->name('index');

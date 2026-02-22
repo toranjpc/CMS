@@ -233,8 +233,9 @@ import Swal from 'sweetalert2'
 import { useWindowQuery } from '@/composables/useWindowQuery'
 
 definePageMeta({
-  layout: 'dashboard',
-  middleware: 'auth'
+  layout: 'windows',
+  middleware: 'auth',
+  title: 'فاکتور فروش'
 })
 
 const { $api } = useNuxtApp()

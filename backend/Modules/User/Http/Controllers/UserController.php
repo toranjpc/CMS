@@ -10,11 +10,91 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 
 class UserController extends Controller
 {
+    protected function isSuperAdmin(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $permissions = $user->per ?? [];
+        return is_array($permissions) && in_array('*', $permissions, true);
+    }
+
+    protected function scopeUsersByRegistrar($query, ?User $actor)
+    {
+        if (!$actor || $this->isSuperAdmin($actor)) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($actor) {
+            $q->where('f_id', $actor->id)->orWhere('id', $actor->id);
+        });
+    }
+
+    protected function ensureUserAccess(User $target, ?User $actor): void
+    {
+        if (!$actor || $this->isSuperAdmin($actor)) {
+            return;
+        }
+
+        if ((int) $target->id === (int) $actor->id) {
+            return;
+        }
+
+        if ((int) $target->f_id !== (int) $actor->id) {
+            abort(response()->json([
+                "status" => "error",
+                "message" => "شما دسترسی این عملیات را ندارید"
+            ], 403));
+        }
+    }
+
+    protected function resolveUserPermissions(?int $jobId): array
+    {
+        if (!$jobId) {
+            return [];
+        }
+
+        $job = Option::query()->where('kind', 'job')->find($jobId);
+        if (!$job) {
+            return [];
+        }
+
+        $permissions = $job->option['permissions'] ?? [];
+        if (!is_array($permissions)) {
+            return [];
+        }
+
+        return array_values(array_unique($permissions));
+    }
+
+    protected function writeAuditLog(string $event, array $context = []): void
+    {
+        $logDir = storage_path('log_monitor');
+        $logFile = $logDir . DIRECTORY_SEPARATOR . 'audit.log';
+
+        if (!File::exists($logDir)) {
+            File::makeDirectory($logDir, 0755, true);
+        }
+
+        $payload = array_merge([
+            'time' => now()->toDateTimeString(),
+            'event' => $event,
+            'actor_id' => auth()->id(),
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ], $context);
+
+        File::append($logFile, json_encode($payload, JSON_UNESCAPED_UNICODE) . PHP_EOL);
+    }
+
     public function index()
     {
+        $me = auth()->user();
         $users = User::with([
             // "reagent",
             // "category",
@@ -24,6 +104,7 @@ class UserController extends Controller
         ])->when(request('accountable', 0), function ($q) {
             $q->where('is_accountable', 1);
         });
+        $users = $this->scopeUsersByRegistrar($users, $me);
 
         if (!empty(request('values'))) {
             $values = request('values');
@@ -90,12 +171,21 @@ class UserController extends Controller
     public function show($userId = 0)
     {
         if ($userId) {
+            $me = auth()->user();
             $user = User::query()
                 ->select('id', 'name', 'lastname', 'mobile')
                 ->when(request('accountable', 0), function ($q) {
                     $q->where('is_accountable', 1);
                 })
-                ->where('id', $userId)
+                ->when(
+                    !$this->isSuperAdmin($me),
+                    function ($q) use ($me) {
+                        $q->where(function ($qq) use ($me) {
+                            $qq->where('f_id', $me?->id)->orWhere('id', $me?->id);
+                        });
+                    }
+                )
+                ->where('id', (int) $userId)
                 ->first();
             if (!$user) {
                 return response()->json([
@@ -112,6 +202,9 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        $me = auth()->user();
+        $registrarId = $me?->id;
+
         $data = $request->validate([
             // اطلاعات پایه
             'name' => 'required|string|max:255',
@@ -119,7 +212,13 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users,username',
 
             // اطلاعات تماس
-            'mobile' => ['required', 'integer', 'unique:users,mobile'],
+            'mobile' => [
+                'required',
+                'integer',
+                Rule::unique('users', 'mobile')->where(function ($query) use ($registrarId) {
+                    $query->where('f_id', $registrarId);
+                }),
+            ],
 
             // اطلاعات شخصی
             'sex' => 'required|integer|in:0,1',
@@ -190,6 +289,7 @@ class UserController extends Controller
 
         // آماده‌سازی داده‌ها برای ذخیره
         $userData = [
+            'f_id' => $registrarId,
             'name' => $data['name'],
             'lastname' => $data['lastname'],
             'username' => $data['username'],
@@ -200,6 +300,7 @@ class UserController extends Controller
             'birth' => $data['birth_date'],
             'password' => bcrypt($data['password']),
             'job' => $data['job'],
+            'per' => $this->resolveUserPermissions($data['job'] ?? null),
             'datas' => [
                 'national_code' => $data['national_code'],
                 'type' => $data['type'],
@@ -208,6 +309,10 @@ class UserController extends Controller
         ];
 
         $user = User::create($userData);
+        $this->writeAuditLog('user_created', [
+            'created_user_id' => $user->id,
+            'registrar_id' => $registrarId,
+        ]);
 
 
         if ($request->hasFile('avatar')) {
@@ -228,6 +333,9 @@ class UserController extends Controller
     public function update(Request $request, user $user)
     {
         // return $request;
+        $me = auth()->user();
+        $this->ensureUserAccess($user, $me);
+        $registrarId = $user->f_id;
 
         $data = $request->validate([
             // اطلاعات پایه
@@ -236,7 +344,15 @@ class UserController extends Controller
             'username' => ['nullable', 'string', 'max:255', 'unique:users,username,' . $user->id],
 
             // اطلاعات تماس
-            'mobile' => ['nullable', 'integer', 'unique:users,mobile,' . $user->id],
+            'mobile' => [
+                'nullable',
+                'integer',
+                Rule::unique('users', 'mobile')
+                    ->ignore($user->id)
+                    ->where(function ($query) use ($registrarId) {
+                        $query->where('f_id', $registrarId);
+                    }),
+            ],
 
             // اطلاعات شخصی
             'sex' => 'nullable|integer|in:0,1',
@@ -310,6 +426,7 @@ class UserController extends Controller
         // if (isset($data['alias'])) $userData['alias'] = $data['alias'];
         if (isset($data['birth_date'])) $userData['birth'] = $data['birth_date'];
         if (isset($data['job'])) $userData['job'] = $data['job'];
+        if (isset($data['job'])) $userData['per'] = $this->resolveUserPermissions((int) $data['job']);
 
         // هش کردن رمز عبور در صورت وجود
         if (!empty($data['password'])) {
@@ -344,12 +461,18 @@ class UserController extends Controller
 
 
         $user->update($userData);
+        $this->writeAuditLog('user_updated', [
+            'target_user_id' => $user->id,
+            'registrar_id' => $user->f_id,
+            'updated_fields' => array_keys($userData),
+        ]);
         return response()->json($user);
     }
 
     public function destroy(user $user)
     {
-        $me = auth()->user;
+        $me = auth()->user();
+        $this->ensureUserAccess($user, $me);
         if ($me->id == $user->id) {
             return response()->json([
                 "status" => "error",
@@ -358,6 +481,10 @@ class UserController extends Controller
         }
 
         $user->delete();
+        $this->writeAuditLog('user_deleted_soft', [
+            'target_user_id' => $user->id,
+            'registrar_id' => $user->f_id,
+        ]);
         return response()->json([
             "status" => "success",
             "message" => "کاربر با موفقیت حذف شد"
@@ -367,6 +494,7 @@ class UserController extends Controller
     public function force_destroy($id)
     {
         $user = user::withTrashed()->findOrFail($id);
+        $this->ensureUserAccess($user, auth()->user());
 
         // پاک کردن فایل آواتار
         $oldAvatarPath = storage_path('app/public/users/' . $user->id . '.*');
@@ -378,6 +506,10 @@ class UserController extends Controller
         }
 
         $user->forceDelete();
+        $this->writeAuditLog('user_deleted_force', [
+            'target_user_id' => (int) $id,
+            'registrar_id' => $user->f_id,
+        ]);
         return response()->json([
             "status" => "success",
             "message" => "کاربر به صورت دائمی حذف شد"
@@ -388,7 +520,12 @@ class UserController extends Controller
     public function restore($id)
     {
         $user = user::withTrashed()->findOrFail($id);
+        $this->ensureUserAccess($user, auth()->user());
         $user->restore();
+        $this->writeAuditLog('user_restored', [
+            'target_user_id' => $user->id,
+            'registrar_id' => $user->f_id,
+        ]);
         return response()->json([
             "status" => "success",
             "message" => "کاربر بازیابی شد",

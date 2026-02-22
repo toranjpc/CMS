@@ -192,35 +192,46 @@
                 </div>
                 <div class="col-12">
                   <label class="form-label">دسترسی‌ها</label>
-                  <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
-                    <div v-for="category in permissionCategories" :key="category" class="mb-3">
-                      <h6 class="mb-2" v-if="category !== '*'">
-                        <input class="d-none" type="checkbox" :id="category"
-                          :checked="isCurrentCategoryChecked(category)"
-                          @change="modalMode !== 'view' ? toggleCurrentCategoryPermissions(category) : null"
-                          :disabled="modalMode === 'view'" />
-                        <label class="btn btn-sm"
-                          :class="isCurrentCategoryChecked(category) ? 'btn-success' : 'btn-outline-secondary'"
-                          :for="category" role="button">
-                          {{ trans(category) }}
-                        </label>
-                      </h6>
-                      <div class="ms-3 permition-list">
-                        <div class="mb-1" v-for="permission in getPermissionsByCategory(category)"
-                          :key="permission.key">
-                          <input class="d-none" type="checkbox" :id="permission.key" v-model="currentRole.permissions"
-                            :value="permission.key" :disabled="modalMode === 'view'" />
-                          <label class="btn d-block btn-xs me-1 mb-1 text-truncate"
-                            :class="currentRole.permissions.includes(permission.key) ? 'btn-primary' : 'btn-outline-primary'"
-                            :for="permission.key" role="button">
-                            {{ trans(permission.label) }}
-                          </label>
-                        </div>
-                      </div>
+                  <div class="border rounded p-3" style="max-height: 430px; overflow-y: auto;">
+                    <div class="mb-3">
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        :class="hasFullAccess ? 'btn-danger' : 'btn-outline-danger'"
+                        :disabled="modalMode === 'view'"
+                        @click="toggleFullAccess"
+                      >
+                        دسترسی کامل (*)
+                      </button>
                     </div>
-                  </div>
-                  <div v-if="availablePermissions.length === 0" class="text-muted small">
-                    در حال بارگذاری دسترسی‌ها...
+
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>صفحه</th>
+                          <th v-for="action in PERMISSION_ACTIONS" :key="action" class="text-center">
+                            {{ actionLabel(action) }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="page in permissionPages" :key="page.key">
+                          <td>
+                            <i :class="`${page.icon} me-2`"></i>
+                            {{ page.title }}
+                          </td>
+                          <td v-for="action in PERMISSION_ACTIONS" :key="`${page.key}-${action}`" class="text-center">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              :checked="hasPageAction(page, action)"
+                              :disabled="modalMode === 'view' || hasFullAccess"
+                              @change="togglePageAction(page, action)"
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -247,9 +258,10 @@
 
 <script setup>
 import Swal from 'sweetalert2'
+import { DASHBOARD_PERMISSION_PAGES, PERMISSION_ACTIONS, buildPermissionsForPage } from '~/utils/permissionCatalog'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'windows',
   middleware: 'auth',
   title: 'نقش‌های کاربری'
 })
@@ -275,14 +287,14 @@ const showRoleModal = ref(false)
 const modalMode = ref('create') /* 'create', 'edit', 'view' */
 const currentRole = ref(null)
 const roleTitleInput = ref(null)
-const availablePermissions = ref([])
+const permissionPages = DASHBOARD_PERMISSION_PAGES
 
 const getData = async (iPP, cP, wP = 0, searchParams = {}) => {
   loading.value = true
   error.value = null
 
   try {
-    let url = `/users/jobs?withPers=${wP}&limit=${iPP}&page=${cP}`
+    let url = `/users/jobs?limit=${iPP}&page=${cP}`
 
     // استفاده از پارامترهای جستجو ارسالی یا پارامترهای فعلی
     const paramsToUse = Object.keys(searchParams).length ? searchParams : searchQuery.value
@@ -307,26 +319,12 @@ const getData = async (iPP, cP, wP = 0, searchParams = {}) => {
     selectedTr.value = []
     currentRowIndex.value = -1 // هیچ سطری انتخاب نشده
 
-    if (response.pers.length) {
-      availablePermissions.value = (response.pers || []).map(perm => ({
-        key: perm,
-        label: perm,
-        category: perm.split('.')[0]
-      }))
-    }
-
   } catch (err) {
     error.value = 'خطا در بارگذاری لیست نقش‌ها'
   } finally {
     loading.value = false
   }
 }
-
-
-const newRole = reactive({
-  title: '',
-  permissions: []
-})
 
 
 onMounted(() => {
@@ -500,48 +498,59 @@ const performCurrentRowAction = () => {
   const selectedRole = roles.value[currentRowIndex.value]
   editRole(selectedRole)
 }
-const permissionCategories = computed(() => {
-  return [...new Set(availablePermissions.value.map(p => p.category))].sort()
+const hasFullAccess = computed(() => {
+  if (!currentRole.value) return false
+  return currentRole.value.permissions.includes('*')
 })
 
-const trans = (text) => {
-  const arr = {
-    "*": "دسترسی کامل",
-    "users": "کاربران",
-    "users.show": "نمایش اطلاعات کاربر",
+const toggleFullAccess = () => {
+  if (!currentRole.value) return
+  if (hasFullAccess.value) {
+    currentRole.value.permissions = currentRole.value.permissions.filter((item) => item !== '*')
+    return
   }
-  return arr[text] || text
+  currentRole.value.permissions = ['*']
 }
 
-const getPermissionsByCategory = (category) => {
-  return availablePermissions.value.filter(p => p.category === category)
+const actionLabel = (action) => {
+  const labels = {
+    view: 'نمایش',
+    create: 'ایجاد',
+    edit: 'ویرایش',
+    delete: 'حذف'
+  }
+  return labels[action] || action
 }
 
-const isCurrentCategoryChecked = (category) => {
+const hasPageAction = (page, action) => {
   if (!currentRole.value) return false
-  const categoryPermissions = getPermissionsByCategory(category)
-  return categoryPermissions.every(perm => currentRole.value.permissions.includes(perm.key))
+  if (currentRole.value.permissions.includes('*')) return true
+  const keys = buildPermissionsForPage(page.apiScopes, action)
+  return keys.every((key) => currentRole.value.permissions.includes(key))
 }
 
-const toggleCurrentCategoryPermissions = (category) => {
+const togglePageAction = (page, action) => {
   if (!currentRole.value) return
 
-  const categoryPermissions = getPermissionsByCategory(category)
-  const permissionKeys = categoryPermissions.map(perm => perm.key)
+  if (currentRole.value.permissions.includes('*')) {
+    currentRole.value.permissions = currentRole.value.permissions.filter((item) => item !== '*')
+  }
 
-  const allSelected = permissionKeys.every(key => currentRole.value.permissions.includes(key))
+  const keys = buildPermissionsForPage(page.apiScopes, action)
+  const allSelected = keys.every((key) => currentRole.value.permissions.includes(key))
+  const nextPermissions = [...currentRole.value.permissions]
 
   if (allSelected) {
-    currentRole.value.permissions = currentRole.value.permissions.filter(perm => !permissionKeys.includes(perm))
-  } else {
-    const newPermissions = [...currentRole.value.permissions]
-    permissionKeys.forEach(key => {
-      if (!newPermissions.includes(key)) {
-        newPermissions.push(key)
-      }
-    })
-    currentRole.value.permissions = newPermissions
+    currentRole.value.permissions = nextPermissions.filter((item) => !keys.includes(item))
+    return
   }
+
+  keys.forEach((key) => {
+    if (!nextPermissions.includes(key)) {
+      nextPermissions.push(key)
+    }
+  })
+  currentRole.value.permissions = nextPermissions
 }
 
 const formatDate = (dateString) => {

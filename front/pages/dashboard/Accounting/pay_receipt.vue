@@ -130,9 +130,9 @@ import Swal from 'sweetalert2'
 import { useWindowQuery } from '@/composables/useWindowQuery'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'windows',
   middleware: 'auth',
-  title: 'سند دريافت و پرداخت'
+  title: 'سند دریافت و پرداخت'
 })
 
 const { $api } = useNuxtApp()

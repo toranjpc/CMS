@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\App\Http\Controllers\AppController;
 
-Route::prefix('apps')->middleware('auth:sanctum')->name('apps.')->group(function () {
+Route::prefix('apps')->middleware(['auth:sanctum', 'checkPermission'])->name('apps.')->group(function () {
     Route::get('/', [AppController::class, 'index'])->name('index');
     Route::post('/list', [AppController::class, 'index'])->name('indexSearch');
     Route::post('{id}', [AppController::class, 'show'])->name('show');
@@ -14,7 +14,7 @@ Route::prefix('apps')->middleware('auth:sanctum')->name('apps.')->group(function
     Route::delete('{id}/force', [AppController::class, 'forceDestroy'])->name('force_destroy');
 });
 
-Route::prefix('branches')->middleware('auth:sanctum')->name('branches.')->group(function () {
+Route::prefix('branches')->middleware(['auth:sanctum', 'checkPermission'])->name('branches.')->group(function () {
     Route::get('/', [AppController::class, 'branches'])->name('index');
     Route::post('/list', [AppController::class, 'branches'])->name('indexSearch');
 });

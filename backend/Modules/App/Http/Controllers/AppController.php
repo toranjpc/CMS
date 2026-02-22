@@ -4,6 +4,7 @@ namespace Modules\App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Modules\App\Models\App;
 use Modules\User\Models\User;
@@ -91,15 +92,15 @@ class AppController extends Controller
     public function show($id)
     {
         try {
-            $app = App::with(['admin:id,name,lastname', 'parent:id,title,url', 'branches:id,title,url,app_id'])->findOrFail($id);
+            $app = App::with(['admin:id,name,lastname', 'parent:id,title,url', 'branches:id,title,url,app_id', 'employees', 'warehouses'])->findOrFail($id);
             
-            // Get plan
-            $plan = ExtData::where('f_id', $app->id)
-                ->where('kind', 'AppPlan')
-                ->with('om:id,title')
-                ->first();
-            
-            $app->plan = $plan?->om;
+            if (is_null($app->app_id)) {
+                $plan = ExtData::where('f_id', $app->id)
+                    ->where('kind', 'AppPlan')
+                    ->with('om:id,title')
+                    ->first();
+                $app->plan = $plan?->om;
+            }
 
             return response()->json([
                 'status' => 'success',
@@ -116,29 +117,48 @@ class AppController extends Controller
     public function store(Request $request)
     {
         try {
-            $data = $request->validate([
-                'uid' => 'required|exists:users,id',
-                'url' => [
-                    'required',
-                    'string',
-                    'max:255',
-                    Rule::unique('apps', 'url')->whereNull('deleted_at')
-                ],
+            $isBranch = !empty($request->input('app_id'));
+
+            // قوانین اعتبارسنجی متفاوت برای پورتال و شعبه
+            $rules = [
                 'title' => 'required|string|max:255',
                 'plan_id' => 'nullable|exists:options,id',
                 'expiry_date' => 'nullable|date',
                 'status' => 'nullable|integer|in:0,1',
                 'app_id' => 'nullable|exists:apps,id',
-            ], [
-                'uid.required' => 'انتخاب کاربر الزامی است',
-                'uid.exists' => 'کاربر انتخاب شده معتبر نیست',
-                'url.required' => 'دامنه الزامی است',
-                'url.unique' => 'این دامنه قبلاً ثبت شده است',
+            ];
+
+            $messages = [
                 'title.required' => 'نام شرکت/مغازه الزامی است',
                 'plan_id.exists' => 'پلن انتخاب شده معتبر نیست',
                 'expiry_date.date' => 'تاریخ اعتبار باید معتبر باشد',
                 'app_id.exists' => 'اکانت اصلی انتخاب شده معتبر نیست',
-            ]);
+            ];
+
+            if ($isBranch) {
+                // شعبه: uid و url ندارد، کارمندان از طریق extdatas
+                unset($rules['plan_id']);
+                $rules['employee_ids'] = 'nullable|array';
+                $rules['employee_ids.*'] = 'exists:users,id';
+                $rules['warehouse_ids'] = 'nullable|array';
+                $rules['warehouse_ids.*'] = [
+                    Rule::exists('product_options', 'id')->where(function ($query) {
+                        $query->where('kind', 'warehouse');
+                    })
+                ];
+                $messages['employee_ids.*.exists'] = 'کاربر انتخاب شده معتبر نیست';
+                $messages['warehouse_ids.*.exists'] = 'انبار انتخاب شده معتبر نیست';
+            } else {
+                // پورتال: uid و url الزامی
+                $rules['uid'] = 'required|exists:users,id';
+                $rules['url'] = ['required', 'string', 'max:255', Rule::unique('apps', 'url')->whereNull('deleted_at')];
+                $messages['uid.required'] = 'انتخاب کاربر الزامی است';
+                $messages['uid.exists'] = 'کاربر انتخاب شده معتبر نیست';
+                $messages['url.required'] = 'دامنه الزامی است';
+                $messages['url.unique'] = 'این دامنه قبلاً ثبت شده است';
+            }
+
+            $data = $request->validate($rules, $messages);
 
             // اگر app_id مشخص شده، بررسی کنیم که خودش شعبه نباشد
             if (!empty($data['app_id'])) {
@@ -152,8 +172,8 @@ class AppController extends Controller
             }
 
             $app = App::create([
-                'uid' => $data['uid'],
-                'url' => $data['url'],
+                'uid' => $isBranch ? null : $data['uid'],
+                'url' => $isBranch ? null : $data['url'],
                 'title' => $data['title'],
                 'status' => $data['status'] ?? 1,
                 'expiry_date' => $data['expiry_date'] ?? null,
@@ -161,7 +181,7 @@ class AppController extends Controller
             ]);
 
             // Attach plan if provided
-            if (!empty($data['plan_id'])) {
+            if (!$isBranch && !empty($data['plan_id'])) {
                 ExtData::create([
                     'f_id' => $app->id,
                     'm_id' => $data['plan_id'],
@@ -170,9 +190,34 @@ class AppController extends Controller
                 ]);
             }
 
+            // شعبه: اتصال کارمندان از طریق extdatas
+            if ($isBranch && !empty($data['employee_ids'])) {
+                foreach ($data['employee_ids'] as $userId) {
+                    ExtData::create([
+                        'f_id' => $app->id,
+                        'm_id' => $userId,
+                        'kind' => 'AppEmployee',
+                        'status' => 1,
+                    ]);
+                }
+            }
+
+            if ($isBranch && !empty($data['warehouse_ids'])) {
+                foreach ($data['warehouse_ids'] as $warehouseId) {
+                    ExtData::create([
+                        'f_id' => $app->id,
+                        'm_id' => $warehouseId,
+                        'kind' => 'AppWarehouse',
+                        'status' => 1,
+                    ]);
+                }
+            }
+
+            $app->load($isBranch ? ['employees', 'warehouses'] : 'admin');
+
             return response()->json([
                 'status' => 'success',
-                'data' => $app->load('admin')
+                'data' => $app
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -191,30 +236,47 @@ class AppController extends Controller
     {
         try {
             $app = App::findOrFail($id);
+            $isBranch = $app->app_id !== null;
 
-            $data = $request->validate([
-                'uid' => 'nullable|exists:users,id',
-                'url' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                    Rule::unique('apps', 'url')->ignore($id)->whereNull('deleted_at')
-                ],
+            $rules = [
                 'title' => 'nullable|string|max:255',
                 'plan_id' => 'nullable|exists:options,id',
                 'expiry_date' => 'nullable|date',
                 'status' => 'nullable|integer|in:0,1',
-                'app_id' => 'nullable|exists:apps,id',
-            ], [
-                'uid.exists' => 'کاربر انتخاب شده معتبر نیست',
-                'url.unique' => 'این دامنه قبلاً ثبت شده است',
+            ];
+
+            $messages = [
                 'plan_id.exists' => 'پلن انتخاب شده معتبر نیست',
                 'expiry_date.date' => 'تاریخ اعتبار باید معتبر باشد',
-                'app_id.exists' => 'اکانت اصلی انتخاب شده معتبر نیست',
-            ]);
+            ];
 
-            // اگر app_id مشخص شده، بررسی کنیم که خودش شعبه نباشد و همچنین خودش نباشد
-            if (isset($data['app_id']) && $data['app_id'] !== null) {
+            if ($isBranch) {
+                // شعبه: فقط کارمندان
+                unset($rules['plan_id']);
+                $rules['employee_ids'] = 'nullable|array';
+                $rules['employee_ids.*'] = 'exists:users,id';
+                $rules['warehouse_ids'] = 'nullable|array';
+                $rules['warehouse_ids.*'] = [
+                    Rule::exists('product_options', 'id')->where(function ($query) {
+                        $query->where('kind', 'warehouse');
+                    })
+                ];
+                $messages['employee_ids.*.exists'] = 'کاربر انتخاب شده معتبر نیست';
+                $messages['warehouse_ids.*.exists'] = 'انبار انتخاب شده معتبر نیست';
+            } else {
+                // پورتال: uid و url
+                $rules['uid'] = 'nullable|exists:users,id';
+                $rules['url'] = ['nullable', 'string', 'max:255', Rule::unique('apps', 'url')->ignore($id)->whereNull('deleted_at')];
+                $rules['app_id'] = 'nullable|exists:apps,id';
+                $messages['uid.exists'] = 'کاربر انتخاب شده معتبر نیست';
+                $messages['url.unique'] = 'این دامنه قبلاً ثبت شده است';
+                $messages['app_id.exists'] = 'اکانت اصلی انتخاب شده معتبر نیست';
+            }
+
+            $data = $request->validate($rules, $messages);
+
+            // بررسی app_id برای پورتال‌ها
+            if (!$isBranch && isset($data['app_id']) && $data['app_id'] !== null) {
                 if ($data['app_id'] == $app->id) {
                     return response()->json([
                         'status' => 'error',
@@ -230,17 +292,24 @@ class AppController extends Controller
                 }
             }
 
-            $app->update(array_filter([
-                'uid' => $data['uid'] ?? null,
-                'url' => $data['url'] ?? null,
+            // فیلدهای قابل آپدیت
+            $updateData = array_filter([
                 'title' => $data['title'] ?? null,
                 'status' => $data['status'] ?? null,
                 'expiry_date' => $data['expiry_date'] ?? null,
-                'app_id' => $data['app_id'] ?? null,
-            ], fn($value) => $value !== null));
+            ], fn($value) => $value !== null);
+
+            if (!$isBranch) {
+                // پورتال: uid و url هم آپدیت شود
+                if (isset($data['uid'])) $updateData['uid'] = $data['uid'];
+                if (isset($data['url'])) $updateData['url'] = $data['url'];
+                if (isset($data['app_id'])) $updateData['app_id'] = $data['app_id'];
+            }
+
+            $app->update($updateData);
 
             // Update plan
-            if (isset($data['plan_id'])) {
+            if (!$isBranch && isset($data['plan_id'])) {
                 ExtData::where('f_id', $app->id)
                     ->where('kind', 'AppPlan')
                     ->delete();
@@ -255,9 +324,44 @@ class AppController extends Controller
                 }
             }
 
+            // شعبه: بروزرسانی کارمندان
+            if ($isBranch && isset($data['employee_ids'])) {
+                // حذف کارمندان قبلی
+                ExtData::where('f_id', $app->id)
+                    ->where('kind', 'AppEmployee')
+                    ->delete();
+
+                // اضافه کردن کارمندان جدید
+                foreach ($data['employee_ids'] as $userId) {
+                    ExtData::create([
+                        'f_id' => $app->id,
+                        'm_id' => $userId,
+                        'kind' => 'AppEmployee',
+                        'status' => 1,
+                    ]);
+                }
+            }
+
+            if ($isBranch && isset($data['warehouse_ids'])) {
+                ExtData::where('f_id', $app->id)
+                    ->where('kind', 'AppWarehouse')
+                    ->delete();
+
+                foreach ($data['warehouse_ids'] as $warehouseId) {
+                    ExtData::create([
+                        'f_id' => $app->id,
+                        'm_id' => $warehouseId,
+                        'kind' => 'AppWarehouse',
+                        'status' => 1,
+                    ]);
+                }
+            }
+
+            $app->load($isBranch ? ['employees', 'warehouses'] : 'admin');
+
             return response()->json([
                 'status' => 'success',
-                'data' => $app->load('admin')
+                'data' => $app
             ], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -329,16 +433,23 @@ class AppController extends Controller
     public function branches(Request $request)
     {
         try {
-            $branches = App::with(['admin:id,name,lastname', 'parent:id,title,url'])
+            $branches = App::with(['employees', 'warehouses', 'parent:id,title,url'])
                 ->whereNotNull('app_id')
                 ->when($request->input('title'), function ($q) use ($request) {
                     $q->where('title', 'LIKE', '%' . $request->input('title') . '%');
                 })
-                ->when($request->input('url'), function ($q) use ($request) {
-                    $q->where('url', 'LIKE', '%' . $request->input('url') . '%');
-                })
                 ->when($request->input('app_id'), function ($q) use ($request) {
                     $q->where('app_id', $request->input('app_id'));
+                })
+                ->when($request->input('mine') === '1', function ($q) {
+                    $userId = Auth::id();
+                    if (!$userId) {
+                        $q->whereRaw('1=0');
+                        return;
+                    }
+                    $q->whereHas('employees', function ($userQuery) use ($userId) {
+                        $userQuery->where('users.id', $userId);
+                    });
                 })
                 ->when($request->input('status') && $request->input('status') == 'deleted', function ($q) {
                     $q->onlyTrashed();
@@ -348,25 +459,6 @@ class AppController extends Controller
                 })
                 ->orderByDesc('id')
                 ->paginate($request->input('limit', 10));
-
-            // Get plans for each branch
-            $branchIds = $branches->pluck('id')->toArray();
-            $branchPlans = collect();
-            
-            if (!empty($branchIds)) {
-                $branchPlans = ExtData::whereIn('f_id', $branchIds)
-                    ->where('kind', 'AppPlan')
-                    ->with('om:id,title')
-                    ->get()
-                    ->groupBy('f_id');
-            }
-
-            // Get expiry dates
-            $branches->getCollection()->transform(function ($branch) use ($branchPlans) {
-                $plan = $branchPlans->get($branch->id)?->first();
-                $branch->plan = $plan?->om ?? null;
-                return $branch;
-            });
 
             return response()->json([
                 'status' => 'success',

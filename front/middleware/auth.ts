@@ -1,4 +1,5 @@
 import { useAuth } from '~/components/useAuth'
+import { buildPermissionsForPage, matchPageByPath } from '~/utils/permissionCatalog'
 
 export default defineNuxtRouteMiddleware(async (to, from) => {
   const { $auth } = useNuxtApp()
@@ -32,7 +33,17 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
       return navigateTo('/login', { replace: true })
     }
 
-    //console.log('✅ User authenticated and token valid')
+    const rawPermissions = auth.user.value?.per
+    const userPermissions = Array.isArray(rawPermissions) ? rawPermissions : []
+    const matchedPage = matchPageByPath(to.path)
+    if (matchedPage && !userPermissions.includes('*')) {
+      const requiredPermissions = buildPermissionsForPage(matchedPage.apiScopes, 'view')
+      const hasViewAccess = requiredPermissions.every((permission) => userPermissions.includes(permission))
+
+      if (!hasViewAccess) {
+        return navigateTo('/dashboard', { replace: true })
+      }
+    }
   } catch (error) {
     //console.error('Token validation error in middleware:', error)
     auth.clearAuth()

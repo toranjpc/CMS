@@ -154,13 +154,13 @@ function createWindowsInstance() {
       type: 'page',
       parent: 'system'
     },
-    branch_list: {
-      title: 'مدیریت شعب',
-      icon: 'fa fa-list-alt',
-      route: '/dashboard/branches',
+    my_branches: {
+      title: 'شعبه‌های من',
+      icon: 'fa fa-code-branch',
+      route: '/dashboard/branches?mine=1',
       type: 'page',
       parent: 'system'
-    }
+    },
   }
 
   // Application data (for backward compatibility)
@@ -295,6 +295,13 @@ function createWindowsInstance() {
       title: 'مدیریت پلن‌ها',
       icon: 'fa fa-list-alt',
       route: '/dashboard/plans',
+      type: 'page',
+      parent: 'system'
+    },
+    my_branches: {
+      title: 'شعبه‌های من',
+      icon: 'fa fa-code-branch',
+      route: '/dashboard/branches?mine=1',
       type: 'page',
       parent: 'system'
     }

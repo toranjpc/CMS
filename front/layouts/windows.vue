@@ -5,7 +5,7 @@
       <!-- Desktop Icons -->
       <div class="desktop-icons" ref="desktopIconsRef">
         <div 
-          v-for="(item, itemKey, index) in menuItems" 
+          v-for="(item, itemKey, index) in filteredMenuItems" 
           :key="itemKey"
           class="desktop-icon"
           :class="{ 
@@ -268,6 +268,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '~/components/useAuth'
 import WindowPageLoader from '~/components/WindowPageLoader.vue'
+import { canViewPath } from '~/utils/permissionCatalog'
 
 const router = useRouter()
 const route = useRoute()
@@ -303,6 +304,21 @@ const {
   getIconPositions,
   saveIconPosition
 } = useWindows()
+
+const userPermissions = computed(() => {
+  const raw = authStore.user.value?.per
+  return Array.isArray(raw) ? raw : []
+})
+
+const filteredMenuEntries = computed(() => {
+  return Object.entries(menuItems).filter(([_, item]) => {
+    return canViewPath(item.route, userPermissions.value)
+  })
+})
+
+const filteredMenuItems = computed(() => {
+  return Object.fromEntries(filteredMenuEntries.value)
+})
 
 const desktopIconsRef = ref(null)
 const notificationIconRef = ref(null)
@@ -382,7 +398,7 @@ const groupedMenuItems = computed(() => {
     system: {}
   }
   
-  Object.entries(menuItems).forEach(([key, item]) => {
+  filteredMenuEntries.value.forEach(([key, item]) => {
     if (!item.parent) {
       groups.main[key] = item
     } else if (item.parent === 'users') {
@@ -882,7 +898,7 @@ onMounted(() => {
     iconPositions.value = constrainedPositions
     
     // Initialize positions for icons that don't have saved positions
-    const menuItemsArray = Object.keys(menuItems)
+    const menuItemsArray = Object.keys(filteredMenuItems.value)
     menuItemsArray.forEach((itemKey, index) => {
       if (!iconPositions.value[itemKey]) {
         const initialPos = getInitialIconPosition(index)
