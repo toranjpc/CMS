@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('options', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
 
             $table->unsignedBigInteger('f_id')->nullable();
             $table->foreign('f_id')->references('id')->on('options')->nullOnDelete();
@@ -29,6 +30,7 @@ return new class extends Migration
 
         Schema::create('extdatas', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             $table->integer('f_id')->default(0);
             $table->integer('m_id')->default(0);
             $table->integer('s_id')->default(0);
@@ -41,6 +43,7 @@ return new class extends Migration
 
         Schema::create('users', function (Blueprint $table) {
             $table->id(); //->from(10000);
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
 
             $table->unsignedBigInteger('f_id')->nullable();
             $table->foreign('f_id')->references('id')->on('users')->nullOnDelete();
@@ -53,7 +56,7 @@ return new class extends Migration
             $table->timestamp('birth')->nullable();
             $table->string('username')->nullable();
             $table->string('password')->nullable();
-            $table->unsignedBigInteger('mobile')->unique()->nullable();
+            $table->unsignedBigInteger('mobile')->nullable();
             $table->timestamp('mobile_verified_at')->nullable();
 
             $table->foreignId('job')->nullable()->constrained('options', 'id')->nullOnDelete();
@@ -65,6 +68,7 @@ return new class extends Migration
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();
+            $table->unique(['f_id', 'mobile'], 'users_f_id_mobile_unique');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

@@ -15,6 +15,7 @@ class CreateSSETable extends Migration
     {
         Schema::create('sse', function (Blueprint $table) {
             $table->string('id')->primary();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             $table->string('model');
             $table->string('event')->nullable();
             $table->string('receiver_id')->nullable();

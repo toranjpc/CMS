@@ -103,6 +103,14 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 
+const playSound = (src) => {
+  if (typeof window === 'undefined') return
+  const audio = new Audio(src)
+  audio.play().catch(() => {
+    // Ignore autoplay/playback restriction errors
+  })
+}
+
 // Use imported validation function
 
 // Validate form
@@ -156,6 +164,7 @@ const handleLogin = async () => {
 
     if (result.success) {
       success.value = 'ورود با موفقیت انجام شد. در حال انتقال...'
+      playSound('/login.mp3')
 
       await nextTick()
       await navigateTo('/dashboard')

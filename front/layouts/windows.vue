@@ -4,21 +4,12 @@
     <div class="desktop">
       <!-- Desktop Icons -->
       <div class="desktop-icons" ref="desktopIconsRef">
-        <div 
-          v-for="(item, itemKey, index) in filteredMenuItems" 
-          :key="itemKey"
-          class="desktop-icon"
-          :class="{ 
-            selected: selectedIcon === itemKey, 
-            dragging: isDraggingIcon && iconDragging.appName === itemKey 
-          }"
-          :data-app="itemKey"
-          :style="getIconStyle(itemKey, index)"
-          @dblclick="openApp(itemKey)"
-          @mousedown="startIconDrag($event, itemKey, index)"
-          @click="selectIcon(itemKey)"
-          @contextmenu="handleContextMenu($event, itemKey)"
-        >
+        <div v-for="(item, itemKey, index) in filteredMenuItems" :key="itemKey" class="desktop-icon" :class="{
+          selected: selectedIcon === itemKey,
+          dragging: isDraggingIcon && iconDragging.appName === itemKey
+        }" :data-app="itemKey" :style="getIconStyle(itemKey, index)" @dblclick="openApp(itemKey)"
+          @mousedown="startIconDrag($event, itemKey, index)" @click="selectIcon(itemKey)"
+          @contextmenu="handleContextMenu($event, itemKey)">
           <div class="icon-image">
             <i :class="item.icon"></i>
           </div>
@@ -28,24 +19,26 @@
 
       <!-- Application Windows -->
       <div class="windows-container">
-        <div
-          v-for="window in openWindows"
-          :key="window.id"
-          class="window"
-          :class="{ minimized: window.minimized, maximized: window.maximized }"
-          :style="getWindowStyle(window)"
-          @mousedown="focusWindow(window.id)"
-        >
+        <div v-for="window in openWindows" :key="window.id" class="window"
+          :class="{ minimized: window.minimized, maximized: window.maximized }" :style="getWindowStyle(window)"
+          @mousedown="focusWindow(window.id)">
           <div class="window-header" @mousedown="startDrag($event, window.id)">
             <div class="window-title">
-              <i :class="window.icon"></i>
+              <button v-if="window.route" class="window-title-refresh"
+                :class="{ spinning: refreshingWindowId === window.id }" title="رفرش صفحه" @mousedown.stop.prevent
+                @click.stop="refreshWindow(window.id)">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+
+              <!-- <i :class="window.icon"></i> -->
               <span>{{ window.title }}</span>
             </div>
             <div class="window-controls">
               <button class="window-control minimize" @click="minimizeWindow(window.id)" title="کوچک کردن">
                 <i class="fas fa-minus"></i>
               </button>
-              <button class="window-control maximize" @click="maximizeWindow(window.id)" :title="window.maximized ? 'بازگرداندن' : 'بزرگ کردن'">
+              <button class="window-control maximize" @click="maximizeWindow(window.id)"
+                :title="window.maximized ? 'بازگرداندن' : 'بزرگ کردن'">
                 <i :class="window.maximized ? 'fas fa-window-restore' : 'fas fa-square'"></i>
               </button>
               <button class="window-control close" @click="closeWindow(window.id)" title="بستن">
@@ -54,7 +47,8 @@
             </div>
           </div>
           <div class="window-content" v-show="!window.minimized">
-            <WindowPageLoader v-if="window.route" :route="window.route" :key="window.id" />
+            <WindowPageLoader v-if="window.route" :route="window.route"
+              :key="`${window.id}-${window.refreshKey || 0}`" />
             <div v-else-if="window.content" v-html="window.content"></div>
           </div>
         </div>
@@ -64,60 +58,42 @@
     <!-- Taskbar -->
     <div class="taskbar">
       <div class="taskbar-left">
-        <button 
-          class="start-button" 
-          :class="{ active: startMenuActive }"
-          @click="toggleStartMenu"
-        >
+        <button class="start-button" :class="{ active: startMenuActive }" @click="toggleStartMenu">
           <i class="fab fa-windows"></i>
         </button>
         <div class="taskbar-apps">
-          <div
-            v-for="window in openWindows"
-            :key="window.id"
-            class="taskbar-app"
-            :class="{ 
-              active: window.zIndex === windowZIndex && !window.minimized,
-              minimized: window.minimized
-            }"
-            @click="focusWindow(window.id)"
-          >
+          <div v-for="window in openWindows" :key="window.id" class="taskbar-app" :class="{
+            active: window.zIndex === windowZIndex && !window.minimized,
+            minimized: window.minimized
+          }" @click="focusWindow(window.id)">
             <i :class="window.icon"></i>
             <span>{{ window.title }}</span>
           </div>
         </div>
       </div>
-      
+
       <div class="taskbar-right">
         <div class="system-tray">
           <!-- Notification Icon -->
-          <div 
-            class="tray-icon notification-icon" 
+          <div class="tray-icon notification-icon"
             :class="{ active: notificationDropdownActive, hasUnread: unreadCount > 0 }"
-            @click.stop="toggleNotificationDropdown"
-            ref="notificationIconRef"
-          >
+            @click.stop="toggleNotificationDropdown" ref="notificationIconRef">
             <i class="fas fa-bell"></i>
             <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
           </div>
-          
+
           <div class="tray-icon">
             <i class="fas fa-wifi"></i>
           </div>
-          <div 
-            class="tray-icon volume-icon" 
-            :class="{ muted: isMuted }"
-            @click.stop="toggleMute"
-            title="قطع/وصل صدا"
-          >
+          <div class="tray-icon voice-icon" :class="voiceIconClass" :title="voiceIconTitle"
+            @click.stop="toggleVoiceMicrophone">
+            <i :class="isVoiceEnabled ? 'fas fa-microphone' : 'fas fa-microphone-slash'"></i>
+          </div>
+          <div class="tray-icon volume-icon" :class="{ muted: isMuted }" @click.stop="toggleMute" title="قطع/وصل صدا">
             <i :class="isMuted ? 'fas fa-volume-mute' : 'fas fa-volume-up'"></i>
           </div>
-          <div 
-            class="tray-icon battery-icon" 
-            :class="{ active: batteryDropdownActive }"
-            @click.stop="toggleBatteryDropdown"
-            ref="batteryIconRef"
-          >
+          <div class="tray-icon battery-icon" :class="{ active: batteryDropdownActive }"
+            @click.stop="toggleBatteryDropdown" ref="batteryIconRef">
             <i class="fas fa-battery-three-quarters"></i>
           </div>
           <div class="datetime">
@@ -126,6 +102,11 @@
           </div>
         </div>
       </div>
+
+      <button class="show-desktop-button" :class="{ active: isFullscreen }"
+        :title="isFullscreen ? 'خروج از حالت تمام صفحه' : 'حالت تمام صفحه'" @click="toggleFullscreen">
+        <!-- <i :class="isFullscreen ? 'fas fa-compress' : 'fas fa-expand'"></i> -->
+      </button>
     </div>
 
     <!-- Start Menu -->
@@ -141,7 +122,7 @@
           </div>
         </div>
       </div>
-      
+
       <div class="start-menu-content">
         <div class="start-menu-left">
           <!-- Main menu items grouped by category -->
@@ -151,13 +132,8 @@
               <span>{{ getGroupTitle(groupName) }}</span>
             </div>
             <div class="menu-section-items">
-              <div
-                v-for="(item, itemKey) in group"
-                :key="itemKey"
-                class="app-tile"
-                :data-app="itemKey"
-                @click="openApp(itemKey)"
-              >
+              <div v-for="(item, itemKey) in group" :key="itemKey" class="app-tile" :data-app="itemKey"
+                @click="openApp(itemKey)">
                 <i :class="item.icon"></i>
                 <span>{{ item.title }}</span>
               </div>
@@ -165,22 +141,36 @@
           </div>
         </div>
       </div>
-      
+
       <div class="start-menu-footer">
-        <button class="power-button" @click="handleLogout">
+        <button class="power-button" @click="openLogoutDialog">
           <i class="fas fa-power-off"></i>
         </button>
       </div>
     </div>
 
+    <!-- Logout Dialog -->
+    <div v-if="logoutDialogActive" class="logout-dialog-overlay" @click.self="cancelLogout">
+      <div class="logout-dialog">
+        <div class="logout-dialog-header">
+          <!-- <i class="fas fa-power-off"></i> -->
+          <span>خروج از سیستم</span>
+        </div>
+        <p class="logout-dialog-text">آیا می‌خواهید از سیستم خارج شوید؟</p>
+        <div class="logout-dialog-actions d-flex">
+          <button class="logout-dialog-btn cancel" @click="cancelLogout">
+            انصراف
+          </button>
+          <button class="logout-dialog-btn confirm" @click="confirmLogout">
+            <i class="fa fa-power-off"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Battery Dropdown -->
-    <div 
-      class="battery-dropdown" 
-      :class="{ active: batteryDropdownActive }"
-      :style="getBatteryDropdownStyle()"
-      @click.stop
-      ref="batteryDropdownRef"
-    >
+    <div class="battery-dropdown" :class="{ active: batteryDropdownActive }" :style="getBatteryDropdownStyle()"
+      @click.stop ref="batteryDropdownRef">
       <div class="battery-info">
         <div class="battery-percentage">90%</div>
         <div class="battery-days">300 روز مانده</div>
@@ -188,20 +178,11 @@
     </div>
 
     <!-- Notification Dropdown -->
-    <div 
-      class="notification-dropdown" 
-      :class="{ active: notificationDropdownActive }"
-      :style="getNotificationDropdownStyle()"
-      @click.stop
-      ref="notificationDropdownRef"
-    >
+    <div class="notification-dropdown" :class="{ active: notificationDropdownActive }"
+      :style="getNotificationDropdownStyle()" @click.stop ref="notificationDropdownRef">
       <div class="notification-dropdown-header">
         <h3>اعلان‌ها</h3>
-        <button 
-          v-if="notifications.length > 0" 
-          class="clear-all-btn"
-          @click="markAllAsRead"
-        >
+        <button v-if="notifications.length > 0" class="clear-all-btn" @click="markAllAsRead">
           همه را خوانده شده علامت بزن
         </button>
       </div>
@@ -210,13 +191,8 @@
           <i class="fas fa-bell-slash"></i>
           <p>اعلانی وجود ندارد</p>
         </div>
-        <div
-          v-for="notification in notifications"
-          :key="notification.id"
-          class="notification-item"
-          :class="{ unread: !notification.read }"
-          @click="openNotification(notification)"
-        >
+        <div v-for="notification in notifications" :key="notification.id" class="notification-item"
+          :class="{ unread: !notification.read }" @click="openNotification(notification)">
           <div class="notification-icon-wrapper">
             <i :class="getNotificationIcon(notification.type)"></i>
           </div>
@@ -231,12 +207,8 @@
     </div>
 
     <!-- Context Menu -->
-    <div 
-      class="context-menu" 
-      :class="{ active: contextMenuActive }"
-      :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
-      @click.stop
-    >
+    <div class="context-menu" :class="{ active: contextMenuActive }"
+      :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }" @click.stop>
       <div class="context-menu-item" @click="handleContextAction('open')">
         <i class="fas fa-folder-open"></i>
         <span>باز کردن</span>
@@ -256,6 +228,11 @@
       </div>
     </div>
 
+    <!-- Temporary debug: show last recognized voice text -->
+    <div v-if="showVoiceTranscriptDebug && lastVoiceTranscript" class="voice-transcript-debug">
+      {{ lastVoiceTranscript }}
+    </div>
+
     <!-- Slot for page content (hidden, windows will show content) -->
     <div style="display: none;">
       <slot />
@@ -268,6 +245,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '~/components/useAuth'
 import WindowPageLoader from '~/components/WindowPageLoader.vue'
+import { createVoiceCommandActions } from '~/composables/voiceCommandActions'
 import { canViewPath } from '~/utils/permissionCatalog'
 
 const router = useRouter()
@@ -325,6 +303,7 @@ const notificationIconRef = ref(null)
 const notificationDropdownRef = ref(null)
 const batteryIconRef = ref(null)
 const batteryDropdownRef = ref(null)
+const isFullscreen = ref(false)
 
 // Icon positions
 const iconPositions = ref({})
@@ -336,8 +315,44 @@ const notificationDropdownActive = ref(false)
 // Battery state
 const batteryDropdownActive = ref(false)
 
+// Logout dialog state
+const logoutDialogActive = ref(false)
+
 // Volume/Mute state - using composable
 const { isMuted, toggleMute, loadMuteState } = useSystemMute()
+
+// Voice commands state
+const {
+  isSupported: isVoiceSupported,
+  isEnabled: isVoiceEnabled,
+  isCommandMode: isVoiceCommandMode,
+  permissionState: voicePermissionState,
+  statusText: voiceStatusText,
+  lastHeardText: lastVoiceTranscript,
+  initRecognition: initVoiceRecognition,
+  setWakePhrase,
+  setCommandTimeout,
+  setCommands: setVoiceCommands,
+  toggleMicrophoneAccess: toggleVoiceAccess,
+  destroy: destroyVoiceCommands
+} = useVoiceCommands()
+
+// Set this to false (or remove this block) when debug view is no longer needed.
+const showVoiceTranscriptDebug = ref(true)
+
+const voiceIconClass = computed(() => ({
+  active: isVoiceEnabled.value,
+  listening: isVoiceCommandMode.value,
+  denied: voicePermissionState.value === 'denied',
+  unsupported: !isVoiceSupported.value
+}))
+
+const voiceIconTitle = computed(() => voiceStatusText.value)
+
+const toggleVoiceMicrophone = async () => {
+  if (!isVoiceSupported.value) return
+  await toggleVoiceAccess()
+}
 
 // Sample notifications data
 const notifications = ref([
@@ -383,6 +398,75 @@ const notifications = ref([
   }
 ])
 
+const playSound = (src) => {
+  if (typeof window === 'undefined') return
+  const audio = new Audio(src)
+  audio.play().catch(() => {
+    // Ignore autoplay/playback restriction errors
+  })
+}
+
+const updateFullscreenState = () => {
+  if (typeof document === 'undefined') return
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+const enterFullscreen = async () => {
+  if (typeof document === 'undefined') return
+  if (document.fullscreenElement) {
+    updateFullscreenState()
+    return
+  }
+
+  try {
+    await document.documentElement.requestFullscreen()
+  } catch {
+    // Some browsers block auto fullscreen without a direct user gesture.
+  } finally {
+    updateFullscreenState()
+  }
+}
+
+const exitFullscreen = async () => {
+  if (typeof document === 'undefined' || !document.fullscreenElement) {
+    updateFullscreenState()
+    return
+  }
+
+  try {
+    await document.exitFullscreen()
+  } finally {
+    updateFullscreenState()
+  }
+}
+
+const toggleFullscreen = async () => {
+  if (document.fullscreenElement) {
+    await exitFullscreen()
+    return
+  }
+  await enterFullscreen()
+}
+
+const refreshingWindowId = ref(null)
+let refreshIconTimer = null
+
+const refreshWindow = (windowId) => {
+  const targetWindow = openWindows.value.find(w => w.id === windowId)
+  if (!targetWindow || !targetWindow.route) return
+
+  refreshingWindowId.value = windowId
+  if (refreshIconTimer) {
+    clearTimeout(refreshIconTimer)
+  }
+  refreshIconTimer = setTimeout(() => {
+    refreshingWindowId.value = null
+    refreshIconTimer = null
+  }, 500)
+
+  targetWindow.refreshKey = (targetWindow.refreshKey || 0) + 1
+}
+
 // Computed unread count
 const unreadCount = computed(() => {
   return notifications.value.filter(n => !n.read).length
@@ -397,7 +481,7 @@ const groupedMenuItems = computed(() => {
     accounting: {},
     system: {}
   }
-  
+
   filteredMenuEntries.value.forEach(([key, item]) => {
     if (!item.parent) {
       groups.main[key] = item
@@ -411,14 +495,14 @@ const groupedMenuItems = computed(() => {
       groups.system[key] = item
     }
   })
-  
+
   // Remove empty groups
   Object.keys(groups).forEach(key => {
     if (Object.keys(groups[key]).length === 0) {
       delete groups[key]
     }
   })
-  
+
   return groups
 })
 
@@ -462,7 +546,7 @@ const constrainIconPosition = (x, y) => {
   const iconWidth = 80
   const iconHeight = 100
   const padding = 5 // Small padding from edges
-  
+
   return {
     x: Math.max(padding, Math.min(x, bounds.width - iconWidth - padding)),
     y: Math.max(padding, Math.min(y, bounds.height - iconHeight - padding))
@@ -479,22 +563,22 @@ const getInitialIconPosition = (index) => {
   const iconHeight = 100
   const padding = 20
   const spacing = 10 // Space between icons
-  
+
   // Calculate how many columns fit in the desktop width
   const availableWidth = bounds.width - (padding * 2)
   const iconsPerRow = Math.floor(availableWidth / (iconWidth + spacing))
   const colsPerRow = Math.max(1, iconsPerRow) // At least 1 column
-  
+
   // Calculate row and column for this icon
   const row = Math.floor(index / colsPerRow)
   const col = index % colsPerRow
-  
+
   // Windows-style: icons start from top-left, arranged in columns
   const position = {
     x: padding + (col * (iconWidth + spacing)),
     y: padding + (row * (iconHeight + spacing))
   }
-  
+
   // Ensure initial position is within bounds
   return constrainIconPosition(position.x, position.y)
 }
@@ -532,20 +616,20 @@ const selectIcon = (appName) => {
 // Icon dragging
 const startIconDrag = (event, appName, index) => {
   if (event.button !== 0) return // Only left click
-  
+
   event.preventDefault()
   event.stopPropagation()
-  
+
   isDraggingIcon.value = true
   iconDragging.value.appName = appName
   currentDraggedIcon.value = appName
-  
+
   const icon = event.currentTarget
   const rect = icon.getBoundingClientRect()
   const desktopRect = desktopIconsRef.value?.getBoundingClientRect() || { left: 0, top: 0 }
-  
+
   const currentPos = iconPositions.value[appName] || getInitialIconPosition(index)
-  
+
   iconDragging.value.startX = event.clientX
   iconDragging.value.startY = event.clientY
   iconDragging.value.offsetX = event.clientX - desktopRect.left - currentPos.x
@@ -554,19 +638,19 @@ const startIconDrag = (event, appName, index) => {
 
 const handleIconMouseMove = (event) => {
   if (typeof window === 'undefined') return
-  
+
   if (isDraggingIcon.value && iconDragging.value.appName) {
     const desktopRect = desktopIconsRef.value?.getBoundingClientRect()
     if (!desktopRect) return
-    
+
     const appName = iconDragging.value.appName
-    
+
     let x = event.clientX - desktopRect.left - iconDragging.value.offsetX
     let y = event.clientY - desktopRect.top - iconDragging.value.offsetY
-    
+
     // Constrain to desktop bounds
     const constrainedPos = constrainIconPosition(x, y)
-    
+
     // Update position
     if (!iconPositions.value[appName]) {
       iconPositions.value[appName] = { x: 0, y: 0 }
@@ -585,7 +669,7 @@ const handleIconMouseUp = () => {
       saveIconPosition(appName, pos.x, pos.y)
     }
   }
-  
+
   isDraggingIcon.value = false
   iconDragging.value.appName = null
   currentDraggedIcon.value = null
@@ -614,7 +698,7 @@ const getWindowStyle = (window) => {
   const style = {
     zIndex: window.zIndex || 100
   }
-  
+
   if (window.minimized) {
     // Hide minimized windows but keep them in DOM to preserve iframe state
     style.visibility = 'hidden'
@@ -640,20 +724,20 @@ const getWindowStyle = (window) => {
     style.display = 'flex'
     style.visibility = 'visible'
   }
-  
+
   return style
 }
 
 // Window dragging
 const startDrag = (event, windowId) => {
   if (event.target.closest('.window-controls')) return
-  
+
   isDragging.value = true
   const window = openWindows.value.find(w => w.id === windowId)
   if (!window) return
-  
+
   currentDraggedWindow.value = window
-  
+
   const rect = event.currentTarget.getBoundingClientRect()
   dragOffset.value = {
     x: event.clientX - rect.left,
@@ -679,11 +763,19 @@ const handleMouseUp = () => {
 }
 
 // Logout
-const handleLogout = () => {
-  if (confirm('آیا می‌خواهید از سیستم خارج شوید؟')) {
-    authStore.logout()
-    router.push('/login')
-  }
+const openLogoutDialog = () => {
+  logoutDialogActive.value = true
+}
+
+const cancelLogout = () => {
+  logoutDialogActive.value = false
+}
+
+const confirmLogout = () => {
+  logoutDialogActive.value = false
+  playSound('/logout.mp3')
+  authStore.logout()
+  router.push('/login')
 }
 
 // Battery functions
@@ -699,11 +791,11 @@ const getBatteryDropdownStyle = () => {
   if (typeof window === 'undefined' || !batteryIconRef.value) {
     return {}
   }
-  
+
   const iconRect = batteryIconRef.value.getBoundingClientRect()
   const dropdownWidth = 180
   const taskbarHeight = 50
-  
+
   // Position dropdown above the taskbar, aligned to the right (RTL)
   return {
     right: `${window.innerWidth - iconRect.right}px`,
@@ -725,12 +817,12 @@ const getNotificationDropdownStyle = () => {
   if (typeof window === 'undefined' || !notificationIconRef.value) {
     return {}
   }
-  
+
   const iconRect = notificationIconRef.value.getBoundingClientRect()
   const dropdownWidth = 380
   const dropdownHeight = 500
   const taskbarHeight = 50
-  
+
   // Position dropdown above the taskbar, aligned to the right (RTL)
   return {
     right: `${window.innerWidth - iconRect.right}px`,
@@ -763,32 +855,32 @@ const formatNotificationTime = (date) => {
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  
+
   if (minutes < 1) return 'همین الان'
   if (minutes < 60) return `${minutes} دقیقه پیش`
   if (hours < 24) return `${hours} ساعت پیش`
   if (days < 7) return `${days} روز پیش`
-  
+
   return date.toLocaleDateString('fa-IR')
 }
 
 const openNotification = (notification) => {
   // Mark as read
   notification.read = true
-  
+
   // Close dropdown
   notificationDropdownActive.value = false
-  
+
   // Open notification in a window
   const windowId = `notification-${notification.id}`
-  
+
   // Check if window already exists
   const existingWindow = openWindows.value.find(w => w.id === windowId)
   if (existingWindow) {
     focusWindow(windowId)
     return
   }
-  
+
   // Create notification content HTML
   const notificationContent = `
     <div class="notification-window-content" style="padding: 20px; direction: rtl; text-align: right;">
@@ -806,13 +898,13 @@ const openNotification = (notification) => {
       </div>
     </div>
   `
-  
+
   // Calculate window position (centered)
   const windowWidth = 600
   const windowHeight = 400
   const x = typeof window !== 'undefined' ? Math.max(0, (window.innerWidth - windowWidth) / 2) : 100
   const y = typeof window !== 'undefined' ? Math.max(0, (window.innerHeight - windowHeight) / 2) : 100
-  
+
   // Create new window object
   const newWindow = {
     id: windowId,
@@ -827,10 +919,10 @@ const openNotification = (notification) => {
     maximized: false,
     zIndex: 0 // Will be set by focusWindow
   }
-  
+
   // Add window to openWindows
   openWindows.value.push(newWindow)
-  
+
   // Focus the window (this will set the z-index properly)
   focusWindow(windowId)
 }
@@ -853,19 +945,19 @@ const markAllAsRead = () => {
 
 // Close start menu on outside click
 const handleClickOutside = (event) => {
-  if (!event.target.closest('.start-menu') && 
-      !event.target.closest('.start-button')) {
+  if (!event.target.closest('.start-menu') &&
+    !event.target.closest('.start-button')) {
     closeStartMenu()
   }
   if (!event.target.closest('.context-menu')) {
     hideContextMenu()
   }
-  if (!event.target.closest('.notification-dropdown') && 
-      !event.target.closest('.notification-icon')) {
+  if (!event.target.closest('.notification-dropdown') &&
+    !event.target.closest('.notification-icon')) {
     notificationDropdownActive.value = false
   }
-  if (!event.target.closest('.battery-dropdown') && 
-      !event.target.closest('.battery-icon')) {
+  if (!event.target.closest('.battery-dropdown') &&
+    !event.target.closest('.battery-icon')) {
     batteryDropdownActive.value = false
   }
   if (!event.target.closest('.desktop-icon')) {
@@ -877,10 +969,10 @@ const handleClickOutside = (event) => {
 onMounted(() => {
   if (typeof window !== 'undefined') {
     initializeDateTime()
-    
+
     // Load mute state from localStorage
     loadMuteState()
-    
+
     // Load saved icon positions
     const savedPositions = getIconPositions()
     // Constrain saved positions to desktop bounds
@@ -896,7 +988,7 @@ onMounted(() => {
       }
     })
     iconPositions.value = constrainedPositions
-    
+
     // Initialize positions for icons that don't have saved positions
     const menuItemsArray = Object.keys(filteredMenuItems.value)
     menuItemsArray.forEach((itemKey, index) => {
@@ -906,11 +998,27 @@ onMounted(() => {
         saveIconPosition(itemKey, initialPos.x, initialPos.y)
       }
     })
-    
+
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('click', handleClickOutside)
     document.addEventListener('contextmenu', handleGlobalContextMenu)
+    document.addEventListener('fullscreenchange', updateFullscreenState)
+
+    initVoiceRecognition()
+    setWakePhrase('هی سامان')
+    setCommandTimeout(30_000)
+    setVoiceCommands(
+      createVoiceCommandActions({
+        openApp,
+        openLogoutDialog,
+        confirmLogout,
+        toggleStartMenu
+      })
+    )
+
+    updateFullscreenState()
+    enterFullscreen()
   }
 })
 
@@ -920,6 +1028,12 @@ onUnmounted(() => {
     document.removeEventListener('mouseup', handleMouseUp)
     document.removeEventListener('click', handleClickOutside)
     document.removeEventListener('contextmenu', handleGlobalContextMenu)
+    document.removeEventListener('fullscreenchange', updateFullscreenState)
+    destroyVoiceCommands()
+  }
+  if (refreshIconTimer) {
+    clearTimeout(refreshIconTimer)
+    refreshIconTimer = null
   }
 })
 
@@ -949,6 +1063,75 @@ definePageMeta({
 .window-content {
   overflow: hidden;
   overflow-y: auto;
+}
+
+.window-title-refresh {
+  border: none;
+  background: transparent;
+  color: #d0d0d0;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+.window-title-refresh:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.window-title-refresh.spinning i {
+  animation: window-refresh-spin 0.5s linear;
+}
+
+.taskbar {
+  position: relative;
+  padding-right: 20px;
+}
+
+.show-desktop-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.show-desktop-button i {
+  font-size: 9px;
+}
+
+.show-desktop-button:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.show-desktop-button.active {
+  background: rgba(76, 175, 80, 0.28);
+}
+
+@keyframes window-refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Tray Icon Styles */
@@ -1191,4 +1374,116 @@ definePageMeta({
   color: #f44336;
 }
 
+/* Voice Icon Styles */
+.voice-icon.active i {
+  color: #4CAF50;
+}
+
+.voice-icon.listening {
+  background-color: rgba(76, 175, 80, 0.2);
+}
+
+.voice-icon.denied i {
+  color: #f44336;
+}
+
+.voice-icon.unsupported {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-transcript-debug {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 56px;
+  z-index: 13000;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  background: rgba(15, 15, 15, 0.407);
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.4;
+  direction: rtl;
+  pointer-events: none;
+  text-align: center;
+}
+
+/* Logout Dialog Styles */
+.logout-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 12000;
+  backdrop-filter: blur(3px);
+}
+
+.logout-dialog {
+  width: min(420px, calc(100vw - 32px));
+  background: #2d2d2d;
+  border: 1px solid #404040;
+  border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+  color: #fff;
+}
+
+.logout-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.logout-dialog-header i {
+  color: #ff9800;
+}
+
+.logout-dialog-text {
+  margin: 0 0 16px;
+  color: #d0d0d0;
+  line-height: 1.7;
+}
+
+.logout-dialog-actions {
+  display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.logout-dialog-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-dialog-btn.cancel {
+  background: #3b3b3b;
+  color: #eee;
+}
+
+.logout-dialog-btn.cancel:hover {
+  background: #4a4a4a;
+}
+
+.logout-dialog-btn.confirm {
+  background: #f44336;
+  color: #fff;
+}
+
+.logout-dialog-btn.confirm:hover {
+  background: #e53935;
+}
 </style>

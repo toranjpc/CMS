@@ -15,6 +15,7 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             $table->foreignIdFor(User::class)->nullable()->constrained()->nullOnDelete();
 
             $table->string('title')->nullable();
@@ -36,6 +37,7 @@ return new class extends Migration
         });
         Schema::create('product_items', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             $table->foreignIdFor(User::class)->nullable()->constrained()->nullOnDelete();
             $table->string('title')->nullable();
 
@@ -46,6 +48,11 @@ return new class extends Migration
             $table->integer('current_stock')->default(0);
             $table->decimal('firstPrice', 15, 2)->default(0);
             $table->decimal('sell_price', 15, 2)->default(0);
+            $table->enum('origin_type', ['with_green_sheet', 'without_green_sheet', 'domestic_production', 'service'])->default('without_green_sheet');
+            $table->json('legal_docs')->nullable();
+            $table->enum('source_type', ['product_definition', 'buy_invoice'])->default('product_definition');
+            $table->unsignedBigInteger('buy_invoice_id')->nullable();
+            $table->unsignedBigInteger('source_product_item_id')->nullable();
 
             $table->boolean('convertUnit')->default(false);
             $table->integer('UnitNumber')->default(0);
@@ -60,6 +67,7 @@ return new class extends Migration
 
         Schema::create('product_options', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
 
             $table->unsignedBigInteger('f_id')->nullable();
             $table->foreign('f_id')->references('id')->on('product_options')->nullOnDelete();
@@ -79,6 +87,7 @@ return new class extends Migration
 
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             $table->string('invoice_number')->unique();
 
             // $table->foreignId('user_id')->nullable();
@@ -101,10 +110,12 @@ return new class extends Migration
         });
         Schema::create('invoice_items', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             // $table->foreignId('invoice_id')->constrained()->cascadeOnDelete();
             $table->foreignIdFor(Invoice::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(Product::class)->constrained()->cascadeOnDelete();
             $table->foreignId('product_item_id')->nullable()->constrained('product_items')->nullOnDelete();
+            $table->foreignId('warehouse_id')->nullable()->constrained('product_options')->nullOnDelete();
             $table->integer('quantity')->default(1);
             $table->decimal('unit_price', 15, 2);
             $table->decimal('total_price', 15, 2);
@@ -114,6 +125,7 @@ return new class extends Migration
         });
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             // نوع سند
             $table->enum('type', ['receive', 'payment'])->comment('receive = دریافت | payment = پرداخت');
             // شماره سند
@@ -124,10 +136,12 @@ return new class extends Migration
             // طرف حساب
             // $table->foreignId('party_id')->comment('مشتری یا فروشنده');
             $table->foreignIdFor(User::class, 'party_id')->constrained()->restrictOnDelete();
+            $table->foreignId('beneficiary_party_id')->nullable()->constrained('users')->restrictOnDelete();
+            $table->uuid('transfer_group_id')->nullable()->index();
             // مبلغ
             $table->decimal('amount', 15, 2);
             // روش پرداخت
-            $table->enum('payment_method', ['cash', 'card', 'bank', 'cheque'])->default('cash');
+            $table->enum('payment_method', ['cash', 'card', 'bank', 'cheque', 'account_to_account'])->default('cash');
             // ارتباط با فاکتور (اختیاری)
             // $table->foreignId('invoice_id')->nullable();
             $table->foreignIdFor(Invoice::class)->nullable()->constrained()->restrictOnDelete();

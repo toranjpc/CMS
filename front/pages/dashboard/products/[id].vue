@@ -90,7 +90,7 @@
                     <div class="col-md-4">
                       <label class="form-label small">دسته‌بندی اصلی
                         <span v-if="selectedMainCategory"> : {{ selectedMainCategory.title || selectedMainCategory
-                        }}</span>
+                          }}</span>
                       </label>
                       <widgets.searchinput v-model="selectedMainCategory" placeholder="دسته‌بندی اصلی"
                         textSearchUrl="/products/categories/list" idSearchUrl="/products/categories/" methode="GET"
@@ -101,7 +101,7 @@
                     <div class="col-md-4">
                       <label class="form-label small">دسته‌بندی فرزند
                         <span v-if="selectedSubCategory"> : {{ selectedSubCategory.title || selectedSubCategory
-                        }}</span>
+                          }}</span>
                       </label>
                       <widgets.searchinput v-model="selectedSubCategory" placeholder="دسته‌بندی فرزند"
                         textSearchUrl="/products/categories/list" idSearchUrl="/products/categories/"
@@ -114,7 +114,7 @@
                     <div class="col-md-4">
                       <label class="form-label small">دسته‌بندی فرزند دوم
                         <span v-if="selectedSubSubCategory"> : {{ selectedSubSubCategory.title || selectedSubSubCategory
-                          }}</span>
+                        }}</span>
                       </label>
                       <widgets.searchinput v-model="selectedSubSubCategory" placeholder="دسته‌بندی فرزند دوم"
                         textSearchUrl="/products/categories/list" idSearchUrl="/products/categories/"
@@ -131,7 +131,6 @@
               </div>
 
               <div class="row g-3">
-
                 <div class="col-md-4">
                   <label class="form-label small">واحد اندازه گیری
                     <span v-if="selectedUnit"> : {{ selectedUnit.title || selectedUnit }}</span>
@@ -223,30 +222,56 @@
 
                     <div class="row g-3">
                       <!-- قیمت و موجودی -->
-                      <div class="col-md-3">
+                      <div class="col-md-2">
                         <label class="form-label">عنوان محصول *</label>
                         <input type="text" class="form-control" v-model="variant.name"
                           :placeholder="`مثال: سایز ${index + 1} یا رنگ ${index + 1}`" :readonly="isView" />
                       </div>
 
+                      <div class="d-flex col-md-3">
+                        <div class="col-md-6">
+                          <label class="form-label">نوع تنوع</label>
+                          <select class="form-select" v-model="variant.origin_type" :disabled="isView"
+                            @change="applyOriginTypeToAllVariants(index)">
+                            <option value="domestic_production">تولید داخل</option>
+                            <option value="without_green_sheet">بدون برگه سبز</option>
+                            <option value="with_green_sheet">دارای برگه سبز</option>
+                            <option value="service">خدمات</option>
+                          </select>
+                        </div>
+
+                        <div class="col-md-6">
+                          <label class="form-label">مدارک قانونی تنوع</label>
+                          <input type="file" class="form-control" multiple
+                            :disabled="isView || variant.origin_type !== 'with_green_sheet'"
+                            @change="onVariantLegalDocsChange(index, $event)" />
+                          <small class="text-muted"
+                            v-if="variant.origin_type === 'with_green_sheet' && variant.legal_docs?.length">
+                            {{ variant.legal_docs.length }} فایل برای این تنوع انتخاب شده
+                          </small>
+                        </div>
+                      </div>
+                      
                       <div class="col-md-2">
                         <label class="form-label">قیمت اول دوره *</label>
-                        <widgets.CurrencyInput v-model="variant.firstPrice" inputClass="form-control" :readonly="isView" />
+                        <widgets.CurrencyInput v-model="variant.firstPrice" inputClass="form-control"
+                          :readonly="isView" />
                       </div>
 
                       <div class="col-md-2">
                         <label class="form-label">موجودی انبار *</label>
                         <input type="number" class="form-control" v-model="variant.firstWarehouse" min="0"
-                          placeholder="0" :readonly="isView" :required="!isView" />
+                          placeholder="0" :readonly="isView || variant.origin_type === 'service'" :required="!isView" />
                       </div>
 
-                      <div class="col-md-3">
+                      <div class="col-md-2">
                         <label class="form-label" for="convertUnit">تبدیل واحد </label>
                         <input type="checkbox" class="mx-2" id="convertUnit" v-model="variant.convertUnit"
-                          :readonly="isView" value="1" @change="variant.UnitNumber = 0; variant.selectConvertUnit = 0" />
+                          :readonly="isView" value="1"
+                          @change="variant.UnitNumber = 0; variant.selectConvertUnit = 0" />
                         <span v-if="variant.convertUnit && variant.convert_unit_relation">({{
                           variant.convert_unit_relation.title
-                        }})</span>
+                          }})</span>
                         <div class="d-flex">
                           <div>
                             <input type="number" class="form-control" v-model="variant.UnitNumber" min="0"
@@ -262,6 +287,8 @@
                         </div>
 
                       </div>
+
+
 
 
                     </div>
@@ -319,7 +346,7 @@
 </template>
 
 <script setup>
-import { watch, nextTick } from 'vue'
+import { watch, nextTick, inject } from 'vue'
 import Swal from 'sweetalert2'
 import CurrencyInput from '@/components/widgets/CurrencyInput.vue'
 
@@ -333,10 +360,19 @@ const route = useRoute()
 const router = useRouter()
 const config = useRuntimeConfig()
 const { $api } = useNuxtApp()
+const windowRouteParams = inject('windowRouteParams', null)
+
+const resolvedRouteId = computed(() => {
+  const routeId = route.params?.id
+  if (routeId) {
+    return Array.isArray(routeId) ? routeId[0] : routeId
+  }
+  return windowRouteParams?.value?.id || null
+})
 
 // تشخیص حالت صفحه: 'add', 'view', 'edit'
 const pageMode = computed(() => {
-  const id = route.params.id
+  const id = resolvedRouteId.value
   if (!id || id === 'add') return 'add'
   if (typeof id === 'string' && id.startsWith('edit_')) return 'edit'
   return 'view'
@@ -344,7 +380,8 @@ const pageMode = computed(() => {
 
 // استخراج ID محصول از route
 const productId = computed(() => {
-  const id = route.params.id
+  const id = resolvedRouteId.value
+  if (!id) return null
   if (pageMode.value === 'edit') {
     return id.replace('edit_', '')
   }
@@ -387,6 +424,8 @@ const productVariants = ref([
     current_stock: 0,
     firstPrice: 0,
     sell_price: 0,
+    origin_type: 'domestic_production',
+    legal_docs: [],
     status: 0,
   }
 ])
@@ -427,6 +466,8 @@ const addVariant = () => {
     firstPrice: 0,
     current_stock: 0,
     sell_price: 0,
+    origin_type: 'domestic_production',
+    legal_docs: [],
     status: 1,
     convertUnit: false,
     UnitNumber: 0,
@@ -482,6 +523,8 @@ const loadProduct = async () => {
         firstPrice: parseFloat(variant.firstPrice) || 0,
         current_stock: variant.current_stock || 0,
         sell_price: parseFloat(variant.sell_price) || 0,
+        origin_type: variant.origin_type || 'domestic_production',
+        legal_docs: [],
         status: variant.status ?? 1,
         // بارگذاری فیلدهای تبدیل واحد از دیتابیس
         convertUnit: variant.convertUnit || false,
@@ -498,6 +541,8 @@ const loadProduct = async () => {
         firstPrice: 0,
         current_stock: 0,
         sell_price: 0,
+        origin_type: 'domestic_production',
+        legal_docs: [],
         status: 1,
         convertUnit: false,
         UnitNumber: 0,
@@ -648,22 +693,34 @@ const appendProductFields = (formData, product, editorContent) => {
   // ارسال تنوع‌ها به صورت آرایه
   productVariants.value.forEach((variant, index) => {
     const variantName = variant.name?.trim() || product.title?.trim() || ''
+    if (variant.origin_type === 'with_green_sheet' && (!variant.legal_docs || variant.legal_docs.length === 0) && !variant.id) {
+      throw new Error(`برای تنوع ${index + 1} (دارای برگه سبز) بارگذاری مدرک الزامی است`)
+    }
+    const normalizedFirstWarehouse = variant.origin_type === 'service' ? 1 : (variant.firstWarehouse || 0)
+    const normalizedCurrentStock = variant.origin_type === 'service' ? 1 : (variant.current_stock || 0)
     // ارسال id برای تنوع‌های موجود (جهت آپدیت بجای حذف و ساخت مجدد)
     if (variant.id) {
       formData.append(`variants[${index}][id]`, variant.id)
     }
     formData.append(`variants[${index}][title]`, variantName)
-    formData.append(`variants[${index}][firstWarehouse]`, variant.firstWarehouse || 0)
+    formData.append(`variants[${index}][firstWarehouse]`, normalizedFirstWarehouse)
     formData.append(`variants[${index}][firstPrice]`, variant.firstPrice || 0)
-    formData.append(`variants[${index}][current_stock]`, variant.current_stock || 0)
+    formData.append(`variants[${index}][current_stock]`, normalizedCurrentStock)
     formData.append(`variants[${index}][sell_price]`, variant.sell_price || 0)
     formData.append(`variants[${index}][status]`, variant.status ?? 1)
+    formData.append(`variants[${index}][origin_type]`, variant.origin_type || 'domestic_production')
     formData.append(`variants[${index}][convertUnit]`, variant.convertUnit ? 1 : 0)
     formData.append(`variants[${index}][UnitNumber]`, variant.UnitNumber || 0)
     if (variant.selectConvertUnit && variant.selectConvertUnit.id) {
       formData.append(`variants[${index}][selectConvertUnit]`, variant.selectConvertUnit.id)
     } else if (variant.selectConvertUnit) {
       formData.append(`variants[${index}][selectConvertUnit]`, variant.selectConvertUnit)
+    }
+
+    if (Array.isArray(variant.legal_docs)) {
+      variant.legal_docs.forEach((file) => {
+        formData.append(`variants[${index}][legal_docs][]`, file)
+      })
     }
   })
 
@@ -677,6 +734,7 @@ const appendProductFields = (formData, product, editorContent) => {
   if (product.form) {
     formData.append('form', JSON.stringify(product.form))
   }
+
 }
 
 // ساخت payload آلبوم برای ارسال به سرور
@@ -801,6 +859,25 @@ const saveAndNew = () => {
 
 const saveAndExit = () => {
   saveProduct('exit')
+}
+
+const onVariantLegalDocsChange = (index, event) => {
+  const files = Array.from(event?.target?.files || [])
+  productVariants.value[index].legal_docs = files
+}
+
+const applyOriginTypeToAllVariants = (index) => {
+  const selectedType = productVariants.value[index]?.origin_type || 'domestic_production'
+  productVariants.value.forEach((variant) => {
+    variant.origin_type = selectedType
+    if (selectedType === 'service') {
+      variant.firstWarehouse = 1
+      variant.current_stock = 1
+    }
+    if (selectedType !== 'with_green_sheet') {
+      variant.legal_docs = []
+    }
+  })
 }
 
 // حذف محصول

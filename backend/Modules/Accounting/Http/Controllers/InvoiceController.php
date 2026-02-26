@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 use Modules\Accounting\Models\Invoice;
 use Modules\Accounting\Models\InvoiceItem;
 use Modules\Accounting\Models\Product;
@@ -16,6 +17,32 @@ use Modules\User\Models\User;
 
 class InvoiceController extends Controller
 {
+    private function handleLegalDocUploads($files, array $existingDocs = []): array
+    {
+        $docs = $existingDocs;
+        if (empty($files)) {
+            return $docs;
+        }
+
+        foreach ($files as $file) {
+            $filename = 'legal_' . Str::uuid() . '.' . strtolower($file->getClientOriginalExtension());
+            $file->storeAs('products/legal_docs', $filename, 'public');
+            $docs[] = [
+                'name' => $file->getClientOriginalName(),
+                'url' => asset('storage/products/legal_docs/' . $filename),
+            ];
+        }
+
+        return $docs;
+    }
+
+    private function syncOriginTypeByProductId(int $productId, string $originType): void
+    {
+        ProductItem::where('f_id', $productId)->update([
+            'origin_type' => $originType,
+        ]);
+    }
+
     public function index()
     {
         $invoices = Invoice::with(['user', 'party'])
@@ -133,6 +160,9 @@ class InvoiceController extends Controller
                 'status' => 'nullable|in:draft,confirmed,paid,cancelled',
                 'description' => 'nullable|string',
                 'items' => 'required|array|min:1',
+                'items.*.origin_type' => ['nullable', Rule::in(ProductItem::ORIGIN_TYPES)],
+                'items.*.legal_docs' => 'nullable|array',
+                'items.*.legal_docs.*' => 'file|max:8192',
                 'items.*.product_item_id' => 'nullable|integer',
                 'items.*.warehouse_id' => [
                     'required',
@@ -196,11 +226,44 @@ class InvoiceController extends Controller
             ]);
 
             // Create invoice items
-            foreach ($data['items'] as $item) {
+            foreach ($data['items'] as $index => $item) {
+                $productItemId = $item['product_item_id'] ?? null;
+                if ($data['type'] === 'buy') {
+                    $originType = $item['origin_type'] ?? ProductItem::ORIGIN_TYPE_WITHOUT_GREEN_SHEET;
+                    $itemDocs = $this->handleLegalDocUploads($request->file("items.$index.legal_docs", []), []);
+                    if ($originType === 'with_green_sheet' && empty($itemDocs)) {
+                        throw ValidationException::withMessages([
+                            "items.$index.legal_docs" => 'برای آیتم دارای برگه سبز، بارگذاری مدارک الزامی است.',
+                        ]);
+                    }
+                    $sourceVariant = null;
+                    if (!empty($item['product_item_id'])) {
+                        $sourceVariant = ProductItem::find($item['product_item_id']);
+                    }
+
+                    $createdProductItem = ProductItem::create([
+                        'user_id' => data_get($request->user(), 'id') ?? 1,
+                        'f_id' => $item['product_id'],
+                        'title' => $sourceVariant?->title ?? (Product::find($item['product_id'])?->title ?? 'خرید'),
+                        'origin_type' => $originType,
+                        'legal_docs' => $originType === ProductItem::ORIGIN_TYPE_WITH_GREEN_SHEET ? $itemDocs : [],
+                        'source_type' => 'buy_invoice',
+                        'buy_invoice_id' => $invoice->id,
+                        'source_product_item_id' => $item['product_item_id'] ?? null,
+                        'firstWarehouse' => (int) $item['quantity'],
+                        'current_stock' => 0,
+                        'firstPrice' => $item['unit_price'],
+                        'sell_price' => $item['unit_price'],
+                        'status' => 1,
+                    ]);
+                    $productItemId = $createdProductItem->id;
+                    $this->syncOriginTypeByProductId((int) $item['product_id'], $originType);
+                }
+
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'product_id' => $item['product_id'],
-                    'product_item_id' => $item['product_item_id'] ?? null,
+                    'product_item_id' => $productItemId,
                     'warehouse_id' => $item['warehouse_id'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
@@ -256,6 +319,9 @@ class InvoiceController extends Controller
                 'status' => 'sometimes|in:draft,confirmed,paid,cancelled',
                 'description' => 'nullable|string',
                 'items' => 'sometimes|array|min:1',
+                'items.*.origin_type' => ['nullable', Rule::in(ProductItem::ORIGIN_TYPES)],
+                'items.*.legal_docs' => 'nullable|array',
+                'items.*.legal_docs.*' => 'file|max:8192',
                 'items.*.product_item_id' => 'nullable|integer',
                 'items.*.warehouse_id' => [
                     'required',
@@ -297,15 +363,62 @@ class InvoiceController extends Controller
 
             // Update items if provided
             if (isset($data['items'])) {
+                $oldItems = $invoice->items()->get();
+                $oldProductItemIds = $oldItems
+                    ->pluck('product_item_id')
+                    ->filter()
+                    ->values()
+                    ->toArray();
+
                 // Delete existing items
                 $invoice->items()->delete();
 
+                if ($invoice->type === 'buy' && !empty($oldProductItemIds)) {
+                    ProductItem::whereIn('id', $oldProductItemIds)
+                        ->where('source_type', 'buy_invoice')
+                        ->where('buy_invoice_id', $invoice->id)
+                        ->delete();
+                }
+
                 // Create new items
-                foreach ($data['items'] as $item) {
+                foreach ($data['items'] as $index => $item) {
+                    $productItemId = $item['product_item_id'] ?? null;
+                    if ($invoice->type === 'buy') {
+                        $originType = $item['origin_type'] ?? ProductItem::ORIGIN_TYPE_WITHOUT_GREEN_SHEET;
+                        $itemDocs = $this->handleLegalDocUploads($request->file("items.$index.legal_docs", []), []);
+                        if ($originType === 'with_green_sheet' && empty($itemDocs)) {
+                            throw ValidationException::withMessages([
+                                "items.$index.legal_docs" => 'برای آیتم دارای برگه سبز، بارگذاری مدارک الزامی است.',
+                            ]);
+                        }
+                        $sourceVariant = null;
+                        if (!empty($item['product_item_id'])) {
+                            $sourceVariant = ProductItem::find($item['product_item_id']);
+                        }
+
+                        $createdProductItem = ProductItem::create([
+                            'user_id' => data_get($request->user(), 'id') ?? 1,
+                            'f_id' => $item['product_id'],
+                            'title' => $sourceVariant?->title ?? (Product::find($item['product_id'])?->title ?? 'خرید'),
+                            'origin_type' => $originType,
+                            'legal_docs' => $originType === ProductItem::ORIGIN_TYPE_WITH_GREEN_SHEET ? $itemDocs : [],
+                            'source_type' => 'buy_invoice',
+                            'buy_invoice_id' => $invoice->id,
+                            'source_product_item_id' => $item['product_item_id'] ?? null,
+                            'firstWarehouse' => (int) $item['quantity'],
+                            'current_stock' => 0,
+                            'firstPrice' => $item['unit_price'],
+                            'sell_price' => $item['unit_price'],
+                            'status' => 1,
+                        ]);
+                        $productItemId = $createdProductItem->id;
+                        $this->syncOriginTypeByProductId((int) $item['product_id'], $originType);
+                    }
+
                     InvoiceItem::create([
                         'invoice_id' => $invoice->id,
                         'product_id' => $item['product_id'],
-                        'product_item_id' => $item['product_item_id'] ?? null,
+                        'product_item_id' => $productItemId,
                         'warehouse_id' => $item['warehouse_id'],
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
@@ -374,28 +487,8 @@ class InvoiceController extends Controller
         }
 
         $productItems = ProductItem::whereIn('id', $productItemIds)
-            ->get(['id', 'title', 'firstWarehouse'])
+            ->get(['id', 'title', 'current_stock'])
             ->keyBy('id');
-
-        $sellRows = DB::table('invoice_items')
-            ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-            ->whereIn('invoice_items.product_item_id', $productItemIds)
-            ->where('invoices.type', 'sell')
-            ->whereNull('invoices.deleted_at')
-            ->when($ignoreInvoiceId, fn($q) => $q->where('invoices.id', '!=', $ignoreInvoiceId))
-            ->selectRaw('product_item_id, COALESCE(SUM(quantity), 0) as total_qty')
-            ->groupBy('product_item_id')
-            ->pluck('total_qty', 'product_item_id');
-
-        $buyRows = DB::table('invoice_items')
-            ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-            ->whereIn('invoice_items.product_item_id', $productItemIds)
-            ->where('invoices.type', 'buy')
-            ->whereNull('invoices.deleted_at')
-            ->when($ignoreInvoiceId, fn($q) => $q->where('invoices.id', '!=', $ignoreInvoiceId))
-            ->selectRaw('product_item_id, COALESCE(SUM(quantity), 0) as total_qty')
-            ->groupBy('product_item_id')
-            ->pluck('total_qty', 'product_item_id');
 
         // برای جلوگیری از عبور مجموع چند ردیف یک محصول در همان درخواست
         $remainingByProductItem = [];
@@ -413,16 +506,13 @@ class InvoiceController extends Controller
             }
 
             if (!array_key_exists($productItemId, $remainingByProductItem)) {
-                $baseStock = (int) ($productItem->firstWarehouse ?? 0);
-                $buyQty = (int) ($buyRows[$productItemId] ?? 0);
-                $sellQty = (int) ($sellRows[$productItemId] ?? 0);
-                $remainingByProductItem[$productItemId] = $baseStock + $buyQty - $sellQty;
+                $remainingByProductItem[$productItemId] = (int) ($productItem->current_stock ?? 0);
             }
 
             if ($requestedQty > $remainingByProductItem[$productItemId]) {
                 throw ValidationException::withMessages([
                     "items.{$index}.quantity" =>
-                        "موجودی {$productItem->title} کافی نیست. موجودی قابل ثبت: {$remainingByProductItem[$productItemId]} | مقدار درخواستی: {$requestedQty}",
+                    "موجودی {$productItem->title} کافی نیست. موجودی قابل ثبت: {$remainingByProductItem[$productItemId]} | مقدار درخواستی: {$requestedQty}",
                 ]);
             }
 

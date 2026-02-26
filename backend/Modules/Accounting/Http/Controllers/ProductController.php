@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 use Modules\Accounting\Models\Product;
 use Modules\Accounting\Models\ProductItem;
 use Modules\Accounting\Models\InvoiceItem;
@@ -20,6 +21,30 @@ use PhpParser\Node\Stmt\TryCatch;
 
 class ProductController extends Controller
 {
+    private function handleLegalDocUploads($files, array $existingDocs = []): array
+    {
+        $docs = $existingDocs;
+        if (empty($files)) {
+            return $docs;
+        }
+
+        foreach ($files as $file) {
+            $filename = 'legal_' . Str::uuid() . '.' . strtolower($file->getClientOriginalExtension());
+            $file->storeAs('products/legal_docs', $filename, 'public');
+            $docs[] = [
+                'name' => $file->getClientOriginalName(),
+                'url' => asset('storage/products/legal_docs/' . $filename),
+            ];
+        }
+
+        return $docs;
+    }
+
+    private function shouldRequireVariantDocs(array $variant): bool
+    {
+        $originType = $variant['origin_type'] ?? ProductItem::ORIGIN_TYPE_WITHOUT_GREEN_SHEET;
+        return $originType === ProductItem::ORIGIN_TYPE_WITH_GREEN_SHEET;
+    }
     /******* categories *******/
     public function category_index()
     {
@@ -1619,39 +1644,17 @@ class ProductController extends Controller
 
         $products = $products->orderByDesc('id')->paginate(request("limit", 10));
 
-        // موجودی لیست محصول: موجودی اول دوره + جمع خرید - جمع فروش
+        // موجودی لیست محصول: جمع current_stock تمام رکوردهای product_items مربوط به محصول
         $productIds = collect($products->items())->pluck('id')->filter()->values()->toArray();
         if (!empty($productIds)) {
-            $initialStocks = ProductItem::query()
-                ->selectRaw('f_id as product_id, COALESCE(SUM(firstWarehouse), 0) as initial_stock')
+            $stocks = ProductItem::query()
+                ->selectRaw('f_id as product_id, COALESCE(SUM(current_stock), 0) as total_stock')
                 ->whereIn('f_id', $productIds)
                 ->groupBy('f_id')
-                ->pluck('initial_stock', 'product_id');
+                ->pluck('total_stock', 'product_id');
 
-            $buyQuantities = InvoiceItem::query()
-                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-                ->selectRaw('product_id, COALESCE(SUM(quantity), 0) as total_qty')
-                ->whereIn('product_id', $productIds)
-                ->where('invoices.type', 'buy')
-                ->whereNull('invoices.deleted_at')
-                ->groupBy('product_id')
-                ->pluck('total_qty', 'product_id');
-
-            $sellQuantities = InvoiceItem::query()
-                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-                ->selectRaw('product_id, COALESCE(SUM(quantity), 0) as total_qty')
-                ->whereIn('product_id', $productIds)
-                ->where('invoices.type', 'sell')
-                ->whereNull('invoices.deleted_at')
-                ->groupBy('product_id')
-                ->pluck('total_qty', 'product_id');
-
-            $products->getCollection()->transform(function ($product) use ($initialStocks, $buyQuantities, $sellQuantities) {
-                $initialStock = (int) ($initialStocks[$product->id] ?? 0);
-                $buyQty = (int) ($buyQuantities[$product->id] ?? 0);
-                $sellQty = (int) ($sellQuantities[$product->id] ?? 0);
-
-                $stockBalance = $initialStock + $buyQty - $sellQty;
+            $products->getCollection()->transform(function ($product) use ($stocks) {
+                $stockBalance = (int) ($stocks[$product->id] ?? 0);
                 // Keep backward compatibility for current front and also expose a clear key.
                 $product->firstWarehouse = $stockBalance;
                 $product->stock_balance = $stockBalance;
@@ -1704,27 +1707,8 @@ class ProductController extends Controller
                     return $items->first()->unit_price;
                 });
 
-            // Stock per variant: initial stock + buy quantities - sell quantities
-            $buyQuantities = DB::table('invoice_items')
-                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-                ->whereIn('product_item_id', $productItemIds)
-                ->where('invoices.type', 'buy')
-                ->whereNull('invoices.deleted_at')
-                ->selectRaw('product_item_id, COALESCE(SUM(quantity), 0) as total_qty')
-                ->groupBy('product_item_id')
-                ->pluck('total_qty', 'product_item_id');
-
-            $sellQuantities = DB::table('invoice_items')
-                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-                ->whereIn('product_item_id', $productItemIds)
-                ->where('invoices.type', 'sell')
-                ->whereNull('invoices.deleted_at')
-                ->selectRaw('product_item_id, COALESCE(SUM(quantity), 0) as total_qty')
-                ->groupBy('product_item_id')
-                ->pluck('total_qty', 'product_item_id');
-
             // Add last prices and display names to product items
-            $productItems->getCollection()->transform(function($item) use ($lastPrices, $invoiceType, $buyQuantities, $sellQuantities) {
+            $productItems->getCollection()->transform(function($item) use ($lastPrices, $invoiceType) {
                 $item->last_used_price = $lastPrices->get($item->id);
 
                 // Add default price based on invoice type
@@ -1734,10 +1718,7 @@ class ProductController extends Controller
                     $item->default_price = $item->firstPrice ?? $item->sell_price;
                 }
 
-                $initialStock = (int) ($item->firstWarehouse ?? 0);
-                $buyQty = (int) ($buyQuantities[$item->id] ?? 0);
-                $sellQty = (int) ($sellQuantities[$item->id] ?? 0);
-                $stockBalance = $initialStock + $buyQty - $sellQty;
+                $stockBalance = (int) ($item->current_stock ?? 0);
                 $item->current_stock = $stockBalance;
                 $item->stock_balance = $stockBalance;
 
@@ -1805,6 +1786,9 @@ class ProductController extends Controller
                     // Variants
                     'variants' => 'required|array|min:1',
                     'variants.*.title' => 'required|string|max:255',
+                    'variants.*.origin_type' => ['nullable', Rule::in(ProductItem::ORIGIN_TYPES)],
+                    'variants.*.legal_docs' => 'nullable|array',
+                    'variants.*.legal_docs.*' => 'file|max:8192',
                     'variants.*.firstWarehouse' => 'nullable|integer',
                     'variants.*.firstPrice' => 'nullable|decimal:0,2',
                     'variants.*.current_stock' => 'nullable|integer',
@@ -1838,6 +1822,10 @@ class ProductController extends Controller
                     'max_buy.integer' => 'حداکثر خرید معتبر نیست',
                     'alert.integer' => 'موجودی هشدار معتبر نیست',
                     'des.string' => 'توضیحات باید متن باشد',
+                    'variants.*.origin_type.in' => 'نوع تنوع باید معتبر باشد',
+                    'variants.*.legal_docs.array' => 'مدارک قانونی هر تنوع باید به صورت آرایه ارسال شوند',
+                    'variants.*.legal_docs.*.file' => 'مدرک قانونی باید فایل معتبر باشد',
+                    'variants.*.legal_docs.*.max' => 'حجم هر مدرک قانونی نباید بیشتر از ۸ مگابایت باشد',
 
                     'selectedUnit.integer' => 'واحد انتخاب شده معتبر نیست',
                     'selectedUnit.exists' => 'واحد انتخاب شده یافت نشد',
@@ -1908,13 +1896,35 @@ class ProductController extends Controller
             ]);
 
             // Create product variants
-            foreach ($data['variants'] as $variant) {
+            $syncedOriginType = collect($data['variants'])
+                ->pluck('origin_type')
+                ->filter()
+                ->first() ?? ProductItem::ORIGIN_TYPE_WITHOUT_GREEN_SHEET;
+
+            foreach ($data['variants'] as $index => $variant) {
+                $originType = $variant['origin_type'] ?? ProductItem::ORIGIN_TYPE_WITHOUT_GREEN_SHEET;
+                $variantDocs = $this->handleLegalDocUploads($request->file("variants.$index.legal_docs", []), []);
+                if ($this->shouldRequireVariantDocs($variant) && empty($variantDocs)) {
+                    throw ValidationException::withMessages([
+                        "variants.$index.legal_docs" => 'برای تنوع دارای برگه سبز، بارگذاری مدارک الزامی است.',
+                    ]);
+                }
+                if ($originType !== ProductItem::ORIGIN_TYPE_WITH_GREEN_SHEET) {
+                    $variantDocs = [];
+                }
+                $normalizedFirstWarehouse = $originType === ProductItem::ORIGIN_TYPE_SERVICE ? 1 : ($variant['firstWarehouse'] ?? 0);
+                $normalizedCurrentStock = $originType === ProductItem::ORIGIN_TYPE_SERVICE ? 1 : ($variant['firstWarehouse'] ?? 0);
+
                 ProductItem::create([
                     'user_id' => Auth::id() ?? 1,
                     'f_id' => $mainProduct->id,
                     'title' => $variant['title'] ?: $data['title'],
-                    'firstWarehouse' => $variant['firstWarehouse'] ?? 0,
-                    'current_stock' => $variant['current_stock'] ?? 0,
+                    'origin_type' => $originType,
+                    'legal_docs' => $variantDocs,
+                    'source_type' => 'product_definition',
+                    'buy_invoice_id' => null,
+                    'firstWarehouse' => $normalizedFirstWarehouse,
+                    'current_stock' => $normalizedCurrentStock,
                     'firstPrice' => $variant['firstPrice'] ?? 0,
                     'sell_price' => $variant['sell_price'] ?? 0,
                     'status' => $variant['status'] ?? 1,
@@ -2017,6 +2027,9 @@ class ProductController extends Controller
 
                     // Variants
                     'variants' => 'required|array|min:1',
+                    'variants.*.origin_type' => ['nullable', Rule::in(ProductItem::ORIGIN_TYPES)],
+                    'variants.*.legal_docs' => 'nullable|array',
+                    'variants.*.legal_docs.*' => 'file|max:8192',
                     'variants.*.id' => 'nullable|integer|exists:product_items,id',
                     'variants.*.title' => 'required|string|max:255',
                     'variants.*.firstWarehouse' => 'nullable|integer',
@@ -2052,6 +2065,10 @@ class ProductController extends Controller
                     'max_buy.integer' => 'حداکثر خرید معتبر نیست',
                     'alert.integer' => 'موجودی هشدار معتبر نیست',
                     'des.string' => 'توضیحات باید متن باشد',
+                    'variants.*.origin_type.in' => 'نوع تنوع باید معتبر باشد',
+                    'variants.*.legal_docs.array' => 'مدارک قانونی هر تنوع باید به صورت آرایه ارسال شوند',
+                    'variants.*.legal_docs.*.file' => 'مدرک قانونی باید فایل معتبر باشد',
+                    'variants.*.legal_docs.*.max' => 'حجم هر مدرک قانونی نباید بیشتر از ۸ مگابایت باشد',
 
                     'selectedUnit.integer' => 'واحد انتخاب شده معتبر نیست',
                     'selectedUnit.exists' => 'واحد انتخاب شده یافت نشد',
@@ -2132,16 +2149,51 @@ class ProductController extends Controller
 
             // حذف تنوع‌هایی که دیگه ارسال نشدن
             ProductItem::where('f_id', $mainProduct->id)
+                ->where('source_type', 'product_definition')
                 ->whereNotIn('id', $sentVariantIds)
                 ->delete();
 
-            foreach ($data['variants'] as $variant) {
+            $syncedOriginType = collect($data['variants'])
+                ->pluck('origin_type')
+                ->filter()
+                ->first() ?? ProductItem::ORIGIN_TYPE_WITHOUT_GREEN_SHEET;
+
+            foreach ($data['variants'] as $index => $variant) {
+                $originType = $variant['origin_type'] ?? ProductItem::ORIGIN_TYPE_WITHOUT_GREEN_SHEET;
+                $existingVariantDocs = [];
+                if (!empty($variant['id'])) {
+                    $existingVariantModel = ProductItem::where('id', $variant['id'])
+                        ->where('source_type', 'product_definition')
+                        ->first();
+                    $existingVariantDocs = $existingVariantModel?->legal_docs ?? [];
+                }
+
+                $variantDocs = $this->handleLegalDocUploads(
+                    $request->file("variants.$index.legal_docs", []),
+                    $existingVariantDocs
+                );
+
+                if ($this->shouldRequireVariantDocs($variant) && empty($variantDocs)) {
+                    throw ValidationException::withMessages([
+                        "variants.$index.legal_docs" => 'برای تنوع دارای برگه سبز، بارگذاری مدارک الزامی است.',
+                    ]);
+                }
+                if ($originType !== ProductItem::ORIGIN_TYPE_WITH_GREEN_SHEET) {
+                    $variantDocs = [];
+                }
+                $normalizedFirstWarehouse = $originType === ProductItem::ORIGIN_TYPE_SERVICE ? 1 : ($variant['firstWarehouse'] ?? 0);
+                $normalizedCurrentStock = $originType === ProductItem::ORIGIN_TYPE_SERVICE ? 1 : ($variant['firstWarehouse'] ?? 0);
+
                 $variantData = [
                     'user_id' => Auth::id() ?? 1,
                     'f_id' => $mainProduct->id,
                     'title' => $variant['title'] ?: $data['title'],
-                    'firstWarehouse' => $variant['firstWarehouse'] ?? 0,
-                    'current_stock' => $variant['current_stock'] ?? 0,
+                    'origin_type' => $originType,
+                    'legal_docs' => $variantDocs,
+                    'source_type' => 'product_definition',
+                    'buy_invoice_id' => null,
+                    'firstWarehouse' => $normalizedFirstWarehouse,
+                    'current_stock' => $normalizedCurrentStock,
                     'firstPrice' => $variant['firstPrice'] ?? 0,
                     'sell_price' => $variant['sell_price'] ?? 0,
                     'status' => $variant['status'] ?? 1,
@@ -2152,7 +2204,9 @@ class ProductController extends Controller
 
                 if (!empty($variant['id'])) {
                     // آپدیت تنوع موجود
-                    ProductItem::where('id', $variant['id'])->update($variantData);
+                    ProductItem::where('id', $variant['id'])
+                        ->where('source_type', 'product_definition')
+                        ->update($variantData);
                 } else {
                     // ساخت تنوع جدید
                     ProductItem::create($variantData);

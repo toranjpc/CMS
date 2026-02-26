@@ -52,7 +52,8 @@
 
       <div class="card-body">
         <div class="row g-2 align-items-end mb-3">
-          <div class="col-md-5">
+
+          <div class="col">
             <label class="form-label">محصول</label>
 
             <widgets.searchinput placeholder="محصول" v-model="product" textSearchUrl="/products/search-for-invoice"
@@ -62,17 +63,39 @@
 
           </div>
 
-          <div class="col-md-2">
+          <div class="col">
             <label class="form-label">تعداد</label>
-            <input type="number" min="1" v-model.number="newItem.quantity" class="form-control" :readonly="isViewingFromList" />
+            <input type="number" min="1" v-model.number="newItem.quantity" class="form-control"
+              :readonly="isViewingFromList || newItem.origin_type === 'service'" />
           </div>
 
-          <div class="col-md-3">
+          <div class="col">
             <label class="form-label">قیمت واحد</label>
             <widgets.CurrencyInput v-model="newItem.unitPrice" :readonly="isViewingFromList" inputClass="form-control" />
           </div>
 
-          <div class="col-md-1">
+          <div class="col">
+            <label class="form-label">نوع تنوع</label>
+            <select class="form-select" v-model="newItem.origin_type" :disabled="isViewingFromList"
+              @change="onItemOriginTypeChange">
+              <option value="domestic_production">تولید داخل</option>
+              <option value="without_green_sheet">بدون برگه سبز</option>
+              <option value="with_green_sheet">دارای برگه سبز</option>
+              <option value="service">خدمات</option>
+            </select>
+          </div>
+
+          <div class="col">
+            <label class="form-label">مدارک قانونی</label>
+            <input type="file" class="form-control" multiple
+              :disabled="isViewingFromList || newItem.origin_type !== 'with_green_sheet'"
+              @change="onItemLegalDocsChange($event)" />
+            <small class="text-muted" v-if="newItem.origin_type === 'with_green_sheet' && newItem.legal_docs?.length">
+              {{ newItem.legal_docs.length }} فایل انتخاب شده
+            </small>
+          </div>
+
+          <div class="col-1">
             <button class="btn btn-primary w-100" @click="addItem" :disabled="isViewingFromList">
               افزودن
             </button>
@@ -309,7 +332,9 @@ const newItem = ref({
   quantity: 1,
   unitPrice: 0,
   discountRate: 0,
-  subtotal: 0
+  subtotal: 0,
+  origin_type: 'domestic_production',
+  legal_docs: []
 })
 
 const handleCustomer = d => (customer.value = d)
@@ -371,6 +396,11 @@ const addItem = () => {
     return
   }
 
+  if (newItem.value.origin_type === 'service') {
+    newItem.value.quantity = 1
+    calcSubtotal()
+  }
+
   const productId = product.value.f_id || product.value.mainProduct?.id
   if (!productId) {
     Swal.fire({
@@ -403,7 +433,9 @@ const addItem = () => {
       ...existing,
       quantity: mergedQty,
       unit_price: mergedUnitPrice,
-      subtotal: mergedSubtotal
+      subtotal: mergedSubtotal,
+      origin_type: newItem.value.origin_type,
+      legal_docs: newItem.value.legal_docs || []
     }
   } else {
   items.value.push({
@@ -413,7 +445,9 @@ const addItem = () => {
     title: product.value.display_name,
     quantity: newItem.value.quantity,
     unit_price: newItem.value.unitPrice,
-    subtotal: newItem.value.subtotal
+    subtotal: newItem.value.subtotal,
+    origin_type: newItem.value.origin_type,
+    legal_docs: newItem.value.legal_docs || []
   })
   }
 
@@ -421,6 +455,8 @@ const addItem = () => {
   newItem.value.quantity = 1
   newItem.value.unitPrice = 0
   newItem.value.subtotal = 0
+  newItem.value.origin_type = 'domestic_production'
+  newItem.value.legal_docs = []
   clearValidationErrors()
 }
 
@@ -718,6 +754,14 @@ const submit = async () => {
       })
       return
     }
+    if (item.origin_type === 'with_green_sheet' && (!item.legal_docs || item.legal_docs.length === 0)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'خطا',
+        text: `آیتم ${i + 1}: برای کالای دارای برگه سبز، بارگذاری مدرک الزامی است`
+      })
+      return
+    }
   }
 
   loading.value = true
@@ -738,15 +782,43 @@ const submit = async () => {
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
-        total_price: item.subtotal
+        total_price: item.subtotal,
+        origin_type: item.origin_type || 'domestic_production'
       }))
     }
 
     console.log('Submitting payload:', payload)
 
     let savedInvoice = null
+    const formData = new FormData()
+    formData.append('type', payload.type)
+    formData.append('party_id', String(payload.party_id))
+    formData.append('date', payload.date)
+    formData.append('subtotal', String(payload.subtotal))
+    formData.append('discount', String(payload.discount))
+    formData.append('tax', String(payload.tax))
+    formData.append('total', String(payload.total))
+    formData.append('status', payload.status)
+    payload.items.forEach((item, index) => {
+      if (item.product_item_id) {
+        formData.append(`items[${index}][product_item_id]`, String(item.product_item_id))
+      }
+      formData.append(`items[${index}][warehouse_id]`, String(item.warehouse_id))
+      formData.append(`items[${index}][product_id]`, String(item.product_id))
+      formData.append(`items[${index}][quantity]`, String(item.quantity))
+      formData.append(`items[${index}][unit_price]`, String(item.unit_price))
+      formData.append(`items[${index}][total_price]`, String(item.total_price))
+      formData.append(`items[${index}][origin_type]`, item.origin_type || 'without_green_sheet')
+      if (item.origin_type === 'with_green_sheet' && Array.isArray(item.legal_docs)) {
+        item.legal_docs.forEach((file) => {
+          formData.append(`items[${index}][legal_docs][]`, file)
+        })
+      }
+    })
+
     if (loadedInvoice.value?.id) {
-      const response = await $api(`/invoices/${loadedInvoice.value.id}`, { method: 'PUT', body: payload })
+      formData.append('_method', 'PUT')
+      const response = await $api(`/invoices/${loadedInvoice.value.id}`, { method: 'POST', body: formData })
       if (response?.status && response.status !== 'success') {
         const err = new Error(response.message || 'validation_error')
         err.response = { status: 422, data: response }
@@ -754,7 +826,7 @@ const submit = async () => {
       }
       savedInvoice = response?.data || loadedInvoice.value
     } else {
-      const response = await $api('/invoices', { method: 'POST', body: payload })
+      const response = await $api('/invoices', { method: 'POST', body: formData })
       if (response?.status && response.status !== 'success') {
         const err = new Error(response.message || 'validation_error')
         err.response = { status: 422, data: response }
@@ -879,6 +951,20 @@ const submitTransaction = async () => {
     })
   } finally {
     transactionLoading.value = false
+  }
+}
+
+const onItemLegalDocsChange = (event) => {
+  newItem.value.legal_docs = Array.from(event?.target?.files || [])
+}
+
+const onItemOriginTypeChange = () => {
+  if (newItem.value.origin_type === 'service') {
+    newItem.value.quantity = 1
+    calcSubtotal()
+  }
+  if (newItem.value.origin_type !== 'with_green_sheet') {
+    newItem.value.legal_docs = []
   }
 }
 </script>

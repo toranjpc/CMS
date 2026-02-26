@@ -37,7 +37,8 @@ class Product extends Model
     // Relationships
     public function variants()
     {
-        return $this->hasMany(ProductItem::class, 'f_id', 'id');
+        return $this->hasMany(ProductItem::class, 'f_id', 'id')
+            ->where('source_type', 'product_definition');
     }
 
     public function categores()
