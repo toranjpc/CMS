@@ -28,6 +28,7 @@ class ProductItem extends Model
         'app_id',
         'f_id',
         'title',
+        'barcode',
         'origin_type',
         'legal_docs',
         'source_type',

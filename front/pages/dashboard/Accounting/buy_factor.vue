@@ -42,7 +42,8 @@
 
         <div class="mt-2">
           <label class="form-label">شماره فاکتور</label>
-          <input type="text" class="form-control" v-model="invoiceNumber" @input="loadExistingInvoice" :readonly="hasRouteInvoice" />
+          <input type="text" class="form-control" v-model="invoiceNumber" @input="loadExistingInvoice"
+            :readonly="hasRouteInvoice" />
         </div>
       </div>
     </div>
@@ -57,7 +58,8 @@
             <label class="form-label">محصول</label>
 
             <widgets.searchinput placeholder="محصول" v-model="product" textSearchUrl="/products/search-for-invoice"
-              idSearchUrl="/products/" methode="POST" :querySearch="{ invoice_type: 'buy' }" :columns="[{ label: 'عنوان', key: 'display_name' },
+              idSearchUrl="/products/" methode="POST" :querySearch="{ invoice_type: 'buy', searchable: 'barcode' }"
+              :columns="[{ label: 'عنوان', key: 'display_name' },
               { label: 'قیمت خرید', key: 'default_price' },
               { label: 'موجودی', key: 'current_stock' }]" :disabled="isViewingFromList ? 1 : 0" />
 
@@ -71,7 +73,8 @@
 
           <div class="col">
             <label class="form-label">قیمت واحد</label>
-            <widgets.CurrencyInput v-model="newItem.unitPrice" :readonly="isViewingFromList" inputClass="form-control" />
+            <widgets.CurrencyInput v-model="newItem.unitPrice" :readonly="isViewingFromList"
+              inputClass="form-control" />
           </div>
 
           <div class="col">
@@ -81,7 +84,6 @@
               <option value="domestic_production">تولید داخل</option>
               <option value="without_green_sheet">بدون برگه سبز</option>
               <option value="with_green_sheet">دارای برگه سبز</option>
-              <option value="service">خدمات</option>
             </select>
           </div>
 
@@ -123,17 +125,17 @@
 
             <template v-for="(item, i) in items" :key="i">
               <tr>
-              <td>{{ i + 1 }}</td>
-              <td>{{ item.title }}</td>
-              <td>{{ item.quantity }}</td>
-              <td>{{ format(item.unit_price) }}</td>
-              <td>{{ format(item.subtotal) }}</td>
-              <td>
-                <button class="btn btn-sm btn-danger" @click="removeItem(i)" :disabled="isViewingFromList">
-                  حذف
-                </button>
-              </td>
-            </tr>
+                <td>{{ i + 1 }}</td>
+                <td>{{ item.title }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ format(item.unit_price) }}</td>
+                <td>{{ format(item.subtotal) }}</td>
+                <td>
+                  <button class="btn btn-sm btn-danger" @click="removeItem(i)" :disabled="isViewingFromList">
+                    حذف
+                  </button>
+                </td>
+              </tr>
               <tr v-if="itemValidationErrors[i]">
                 <td colspan="6" class="text-danger small py-1">
                   {{ itemValidationErrors[i] }}
@@ -161,7 +163,8 @@
 
             <div class="d-flex justify-content-between align-items-center mt-2">
               <span>تخفیف کل:</span>
-              <input type="number" class="form-control form-control-sm w-50" v-model.number="invoiceDiscount" @input="calculateTotals" :readonly="isViewingFromList" />
+              <input type="number" class="form-control form-control-sm w-50" v-model.number="invoiceDiscount"
+                @input="calculateTotals" :readonly="isViewingFromList" />
             </div>
 
             <div class="d-flex justify-content-between mt-2">
@@ -180,15 +183,13 @@
               <button v-if="!isViewingFromList" class="btn btn-success w-100" :disabled="loading" @click="submit">
                 {{ loading ? 'در حال پردازش...' : submitButtonText }}
               </button>
-              <button v-if="!isViewingFromList" class="btn btn-outline-secondary" :disabled="loading" @click="startNewInvoice">
+              <button v-if="!isViewingFromList" class="btn btn-outline-secondary" :disabled="loading"
+                @click="startNewInvoice">
                 فاکتور جدید
               </button>
             </div>
-            <button
-              v-if="loadedInvoice?.id && !isViewingFromList"
-              class="btn btn-outline-primary w-100 mt-2"
-              :disabled="transactionLookupLoading"
-              @click="openTransactionWidgetForInvoice(loadedInvoice)">
+            <button v-if="loadedInvoice?.id && !isViewingFromList" class="btn btn-outline-primary w-100 mt-2"
+              :disabled="transactionLookupLoading" @click="openTransactionWidgetForInvoice(loadedInvoice)">
               {{ transactionLookupLoading ? 'در حال دریافت اسناد...' : transactionTitle }}
             </button>
           </div>
@@ -217,15 +218,11 @@
           </div>
 
           <div v-if="transactionListLoading" class="text-muted small">در حال بارگذاری اسناد...</div>
-          <div v-else-if="transactionList.length === 0" class="text-muted small">برای این فاکتور هنوز سندی ثبت نشده است.</div>
+          <div v-else-if="transactionList.length === 0" class="text-muted small">برای این فاکتور هنوز سندی ثبت نشده است.
+          </div>
           <div v-else class="transaction-list">
-            <button
-              v-for="tr in transactionList"
-              :key="tr.id"
-              type="button"
-              class="transaction-list-item"
-              :class="{ active: currentTransaction?.id === tr.id }"
-              @click="selectTransactionForEdit(tr)">
+            <button v-for="tr in transactionList" :key="tr.id" type="button" class="transaction-list-item"
+              :class="{ active: currentTransaction?.id === tr.id }" @click="selectTransactionForEdit(tr)">
               <span>{{ tr.transaction_number }}</span>
               <span>{{ format(tr.amount) }}</span>
             </button>
@@ -239,7 +236,8 @@
             <button class="btn btn-success flex-grow-1" :disabled="transactionLoading" @click="submitTransaction">
               {{ transactionLoading ? 'در حال ثبت...' : transactionSubmitText }}
             </button>
-            <button class="btn btn-outline-secondary" :disabled="transactionLoading" @click="showTransactionForm = false">
+            <button class="btn btn-outline-secondary" :disabled="transactionLoading"
+              @click="showTransactionForm = false">
               انصراف
             </button>
           </div>
@@ -257,7 +255,7 @@ import Swal from 'sweetalert2'
 import { useWindowQuery } from '@/composables/useWindowQuery'
 
 definePageMeta({
-      layout: 'windows',
+  layout: 'windows',
   middleware: 'auth',
   title: 'فاکتور خرید'
 })
@@ -366,6 +364,15 @@ if (process.client) {
 
 watch(product, (newVal, oldVal) => {
   if (!newVal) return
+  if (newVal.origin_type === 'service') {
+    Swal.fire({
+      icon: 'warning',
+      title: 'غیرمجاز',
+      text: 'ثبت آیتم خدمات در فاکتور خرید مجاز نیست'
+    })
+    product.value = null
+    return
+  }
   // Use last used price if available, otherwise use default price
   const lastPrice = getLastUsedPrice(newVal.id)
   newItem.value.unitPrice = lastPrice !== null ? lastPrice : (newVal.last_used_price || newVal.default_price || 0)
@@ -387,6 +394,14 @@ watch(
 
 const addItem = () => {
   if (!product.value || newItem.value.quantity <= 0) return
+  if (product.value.origin_type === 'service' || newItem.value.origin_type === 'service') {
+    Swal.fire({
+      icon: 'warning',
+      title: 'غیرمجاز',
+      text: 'ثبت آیتم خدمات در فاکتور خرید مجاز نیست'
+    })
+    return
+  }
   if (!warehouse.value || !warehouse.value.id) {
     Swal.fire({
       icon: 'warning',
@@ -394,11 +409,6 @@ const addItem = () => {
       text: 'لطفا ابتدا انبار را انتخاب کنید'
     })
     return
-  }
-
-  if (newItem.value.origin_type === 'service') {
-    newItem.value.quantity = 1
-    calcSubtotal()
   }
 
   const productId = product.value.f_id || product.value.mainProduct?.id
@@ -438,17 +448,17 @@ const addItem = () => {
       legal_docs: newItem.value.legal_docs || []
     }
   } else {
-  items.value.push({
-    product_item_id: product.value.id, // استفاده از product_item_id
-    warehouse_id: warehouse.value.id,
-    product_id: productId, // استفاده از product_id والد
-    title: product.value.display_name,
-    quantity: newItem.value.quantity,
-    unit_price: newItem.value.unitPrice,
-    subtotal: newItem.value.subtotal,
-    origin_type: newItem.value.origin_type,
-    legal_docs: newItem.value.legal_docs || []
-  })
+    items.value.push({
+      product_item_id: product.value.id, // استفاده از product_item_id
+      warehouse_id: warehouse.value.id,
+      product_id: productId, // استفاده از product_id والد
+      title: product.value.display_name,
+      quantity: newItem.value.quantity,
+      unit_price: newItem.value.unitPrice,
+      subtotal: newItem.value.subtotal,
+      origin_type: newItem.value.origin_type,
+      legal_docs: newItem.value.legal_docs || []
+    })
   }
 
   product.value = null
@@ -960,8 +970,12 @@ const onItemLegalDocsChange = (event) => {
 
 const onItemOriginTypeChange = () => {
   if (newItem.value.origin_type === 'service') {
-    newItem.value.quantity = 1
-    calcSubtotal()
+    newItem.value.origin_type = 'domestic_production'
+    Swal.fire({
+      icon: 'warning',
+      title: 'غیرمجاز',
+      text: 'نوع خدمات برای فاکتور خرید مجاز نیست'
+    })
   }
   if (newItem.value.origin_type !== 'with_green_sheet') {
     newItem.value.legal_docs = []

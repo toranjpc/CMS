@@ -1,8 +1,11 @@
 <template>
     <div class="" style="gap: 10px;">
-        <div class="w-100">
+        <div class="w-100 inputSwitchWrapper" @mouseenter="isInputHovered = true" @mouseleave="isInputHovered = false">
             <input type="text" class="form-control text-center" v-model="searchableID" :placeholder="props.placeholder"
-                @keyup="searchById" @keydown.enter.prevent @focus="$event.target.select()" :disabled="disabled">
+                @keyup="searchById" @keydown.enter.prevent @focus="onPrimaryInputFocus" @blur="onPrimaryInputBlur"
+                :disabled="disabled" :class="{ 'main-input-hidden': showDisplayInput }">
+            <input v-if="showDisplayInput" type="text" class="form-control text-center displayInput" :value="displayTitle"
+                :placeholder="props.placeholder" readonly tabindex="-1" :disabled="disabled">
         </div>
         <!-- <div class="w-100" :class="searchResultLable ? 'pt-1' : ''">
             <span v-html="searchResultLable"></span>
@@ -128,6 +131,8 @@ const paginate = ref([]);
 const searchByTextFilde = ref('');
 const inputRef = ref(null)
 const baseDatas = ref({});
+const isInputHovered = ref(false)
+const isPrimaryInputFocused = ref(false)
 
 
 let keyupdelay = 0
@@ -303,6 +308,32 @@ const resolveValue = (obj, path) => {
         .reduce((acc, key) => acc?.[key], obj) ?? ''
 }
 
+const displayTitle = computed(() => {
+    const val = props.modelValue
+    if (!val || typeof val !== 'object') return ''
+    if (val.title) return String(val.title)
+    if (props.columns?.length) {
+        const firstKey = props.columns[0]?.key
+        const resolved = resolveValue(val, firstKey)
+        if (resolved) return String(resolved)
+    }
+    return ''
+})
+
+const showDisplayInput = computed(() => {
+    if (!displayTitle.value) return false
+    return !isInputHovered.value && !isPrimaryInputFocused.value
+})
+
+const onPrimaryInputFocus = (e) => {
+    isPrimaryInputFocused.value = true
+    e.target.select()
+}
+
+const onPrimaryInputBlur = () => {
+    isPrimaryInputFocused.value = false
+}
+
 
 const keydownHandler = e => {
     if (searchByTextDialog.value) handleDialogKeydown(e)
@@ -452,5 +483,20 @@ watch(() => props.modelValue, (val) => {
 .selected-row td:last-child {
     border-radius: 11px 0 0 11px;
     /* box-shadow: -1px 0px 0 1px #c1c1c1; */
+}
+
+.inputSwitchWrapper {
+    position: relative;
+}
+
+.displayInput {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    font-weight: bold;
+}
+
+.main-input-hidden {
+    opacity: 0;
 }
 </style>

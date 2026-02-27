@@ -57,7 +57,8 @@
             <label class="form-label">محصول</label>
 
             <widgets.searchinput placeholder="محصول" v-model="product" textSearchUrl="/products/search-for-invoice"
-              idSearchUrl="/products/" methode="POST" :querySearch="{ invoice_type: 'sell' }" :columns="[{ label: 'عنوان', key: 'display_name' },
+              idSearchUrl="/products/" methode="POST" :querySearch="{ invoice_type: 'sell', searchable: 'barcode' }"
+              :columns="[{ label: 'عنوان', key: 'display_name' },
               { label: 'قیمت فروش', key: 'default_price' },
               { label: 'موجودی', key: 'current_stock' }]" :disabled="isViewingFromList ? 1 : 0" />
 
@@ -66,7 +67,7 @@
           <div class="col-md-2">
             <label class="form-label">تعداد</label>
             <input type="number" min="1" v-model.number="newItem.quantity" class="form-control"
-              :readonly="isViewingFromList" />
+              :readonly="isViewingFromList || isServiceProductSelected" />
           </div>
 
           <div class="col-md-3">
@@ -274,6 +275,7 @@ const isViewingFromList = computed(() => hasRouteInvoice.value && windowQuery.va
 const submitButtonText = computed(() =>
   loadedInvoice.value?.id ? 'ویرایش فاکتور' : 'ثبت فاکتور'
 )
+const isServiceProductSelected = computed(() => product.value?.origin_type === 'service')
 const transactionTypeForInvoice = computed(() =>
   savedInvoiceForTransaction.value?.type === 'buy' ? 'payment' : 'receive'
 )
@@ -342,6 +344,9 @@ watch(product, (newVal, oldVal) => {
   if (!newVal) return
   // Use last used price if available, otherwise use default price
   const lastPrice = getLastUsedPrice(newVal.id)
+  if (newVal.origin_type === 'service') {
+    newItem.value.quantity = 1
+  }
   newItem.value.unitPrice = lastPrice !== null ? lastPrice : (newVal.last_used_price || newVal.default_price || 0)
   calcSubtotal()
 })
@@ -357,6 +362,10 @@ watch(
 
 const addItem = () => {
   if (!product.value || newItem.value.quantity <= 0) return
+  if (product.value.origin_type === 'service') {
+    newItem.value.quantity = 1
+    calcSubtotal()
+  }
   if (!warehouse.value || !warehouse.value.id) {
     Swal.fire({
       icon: 'warning',

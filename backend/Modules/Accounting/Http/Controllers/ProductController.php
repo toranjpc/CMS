@@ -1672,7 +1672,7 @@ class ProductController extends Controller
     public function searchForInvoice()
     {
         $productItems = ProductItem::with([
-            'mainProduct' => function($query) {
+            'mainProduct' => function ($query) {
                 $query->select('id', 'title', 'barcode');
             }
         ]);
@@ -1681,7 +1681,8 @@ class ProductController extends Controller
             $values = request('values');
             $productItems = $productItems->where(function ($q) use ($values) {
                 $q->where('title', 'LIKE', '%' . $values . '%')
-                    ->orWhereHas('mainProduct', function($pq) use ($values) {
+                    ->orWhere('barcode', 'LIKE', '%' . $values . '%')
+                    ->orWhereHas('mainProduct', function ($pq) use ($values) {
                         $pq->where('title', 'LIKE', '%' . $values . '%')
                             ->orWhere('barcode', 'LIKE', '%' . $values . '%');
                     });
@@ -1689,9 +1690,10 @@ class ProductController extends Controller
         }
 
         $productItems = $productItems->orderByDesc('id')->paginate(request("limit", 10));
+        $productItemIds = $productItems->pluck('id')->toArray();
+
 
         // Add last used prices from invoices
-        $productItemIds = $productItems->pluck('id')->toArray();
         $invoiceType = request('invoice_type', 'sell');
 
         if (!empty($productItemIds)) {
@@ -1703,12 +1705,12 @@ class ProductController extends Controller
                 ->orderBy('invoices.date', 'desc')
                 ->get()
                 ->groupBy('product_item_id')
-                ->map(function($items) {
+                ->map(function ($items) {
                     return $items->first()->unit_price;
                 });
 
             // Add last prices and display names to product items
-            $productItems->getCollection()->transform(function($item) use ($lastPrices, $invoiceType) {
+            $productItems->getCollection()->transform(function ($item) use ($lastPrices, $invoiceType) {
                 $item->last_used_price = $lastPrices->get($item->id);
 
                 // Add default price based on invoice type
@@ -1740,16 +1742,55 @@ class ProductController extends Controller
 
     public function show($id)
     {
+        $searchable = request('searchable', 'id');
+
+        if ($searchable === 'barcode') {
+            $invoiceType = request('invoice_type', 'sell');
+            $productItem = ProductItem::with([
+                'mainProduct' => function ($query) {
+                    $query->select('id', 'title', 'barcode');
+                }
+            ])->where('barcode', $id)->first();
+
+            if (!$productItem) {
+                return response()->json([
+                    "status" => "unsuccess",
+                    "message" => "محصولی با این بارکد یافت نشد"
+                ], 404);
+            }
+
+            $lastPrice = DB::table('invoice_items')
+                ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+                ->where('invoice_items.product_item_id', $productItem->id)
+                ->where('invoices.type', $invoiceType)
+                ->orderBy('invoices.date', 'desc')
+                ->value('invoice_items.unit_price');
+
+            $productItem->last_used_price = $lastPrice;
+            $productItem->default_price = $invoiceType === 'sell'
+                ? $productItem->sell_price
+                : ($productItem->firstPrice ?? $productItem->sell_price);
+            $productItem->current_stock = (int) ($productItem->current_stock ?? 0);
+            $productItem->stock_balance = $productItem->current_stock;
+            $mainProductTitle = $productItem->mainProduct ? $productItem->mainProduct->title : '';
+            $productItem->display_name = $mainProductTitle . ' - ' . $productItem->title;
+
+            return response()->json([
+                "status" => "success",
+                "data" => $productItem
+            ], 200);
+        }
+
         $Product = Product::with([
-                'variants' => function($query) {
-                    $query->with('convertUnitRelation');
-                },
-                'categores',
-                'option',
-                'brand',
-                'unit',
-                'warehouse'
-            ])
+            'variants' => function ($query) {
+                $query->with('convertUnitRelation');
+            },
+            'categores',
+            'option',
+            'brand',
+            'unit',
+            'warehouse'
+        ])
             ->where('id', $id)
             ->withTrashed()
             ->first();
@@ -1769,7 +1810,7 @@ class ProductController extends Controller
                     // Main product fields
                     'status' => 'nullable|integer',
                     'title' => 'required|string|max:255',
-                    'barcode' => 'required|string|max:255|unique:products,barcode',
+                    'barcode' => 'nullable|string|max:255|unique:products,barcode',
                     'tax_rate' => 'nullable|integer',
                     'min_buy' => 'nullable|integer',
                     'max_buy' => 'nullable|integer',
@@ -1786,6 +1827,7 @@ class ProductController extends Controller
                     // Variants
                     'variants' => 'required|array|min:1',
                     'variants.*.title' => 'required|string|max:255',
+                    'variants.*.barcode' => 'required|string|max:255|distinct|unique:product_items,barcode',
                     'variants.*.origin_type' => ['nullable', Rule::in(ProductItem::ORIGIN_TYPES)],
                     'variants.*.legal_docs' => 'nullable|array',
                     'variants.*.legal_docs.*' => 'file|max:8192',
@@ -1811,7 +1853,6 @@ class ProductController extends Controller
                     'title.string' => 'عنوان محصول باید متن باشد',
                     'title.max' => 'عنوان محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
 
-                    'barcode.required' => 'بارکد محصول الزامی است',
                     'barcode.string' => 'بارکد محصول باید متن باشد',
                     'barcode.max' => 'بارکد محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
                     'barcode.unique' => 'این بارکد قبلاً ثبت شده است',
@@ -1844,6 +1885,11 @@ class ProductController extends Controller
                     'variants.*.title.required' => 'عنوان تنوع الزامی است',
                     'variants.*.title.string' => 'عنوان تنوع باید متن باشد',
                     'variants.*.title.max' => 'عنوان تنوع نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'variants.*.barcode.required' => 'بارکد تنوع الزامی است',
+                    'variants.*.barcode.string' => 'بارکد تنوع باید متن باشد',
+                    'variants.*.barcode.max' => 'بارکد تنوع نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'variants.*.barcode.distinct' => 'بارکد تنوع‌ها نباید تکراری باشد',
+                    'variants.*.barcode.unique' => 'این بارکد تنوع قبلاً ثبت شده است',
 
                     'variants.*.firstWarehouse.integer' => 'انبار اولیه باید عدد صحیح باشد',
                     'variants.*.firstPrice.decimal' => 'قیمت اولیه باید عدد باشد',
@@ -1883,7 +1929,7 @@ class ProductController extends Controller
             $mainProduct = Product::create([
                 'user_id' => Auth::id() ?? 1,
                 'title' => $data['title'],
-                'barcode' => $data['barcode'],
+                'barcode' => $data['barcode'] ?? null,
                 'album' => $albumData,
                 'tags' => null,
                 'des' => $data['des'] ?? null,
@@ -1919,6 +1965,7 @@ class ProductController extends Controller
                     'user_id' => Auth::id() ?? 1,
                     'f_id' => $mainProduct->id,
                     'title' => $variant['title'] ?: $data['title'],
+                    'barcode' => $variant['barcode'] ?? null,
                     'origin_type' => $originType,
                     'legal_docs' => $variantDocs,
                     'source_type' => 'product_definition',
@@ -1978,7 +2025,7 @@ class ProductController extends Controller
             return response()->json([
                 "status" => "success",
                 "data" => $mainProduct->load([
-                    'variants' => function($query) {
+                    'variants' => function ($query) {
                         $query->with('convertUnitRelation');
                     },
                     'categores',
@@ -2011,7 +2058,7 @@ class ProductController extends Controller
                     // Main product fields
                     'status' => 'nullable|integer',
                     'title' => 'required|string|max:255',
-                    'barcode' => ['required', 'string', 'max:255', Rule::unique('products', 'barcode')->ignore($id ?? null)],
+                    'barcode' => ['nullable', 'string', 'max:255', Rule::unique('products', 'barcode')->ignore($id ?? null)],
                     'tax_rate' => 'nullable|integer',
                     'min_buy' => 'nullable|integer',
                     'max_buy' => 'nullable|integer',
@@ -2032,6 +2079,7 @@ class ProductController extends Controller
                     'variants.*.legal_docs.*' => 'file|max:8192',
                     'variants.*.id' => 'nullable|integer|exists:product_items,id',
                     'variants.*.title' => 'required|string|max:255',
+                    'variants.*.barcode' => 'required|string|max:255|distinct',
                     'variants.*.firstWarehouse' => 'nullable|integer',
                     'variants.*.firstPrice' => 'nullable|decimal:0,2',
                     'variants.*.current_stock' => 'nullable|integer',
@@ -2054,7 +2102,6 @@ class ProductController extends Controller
                     'title.string' => 'عنوان محصول باید متن باشد',
                     'title.max' => 'عنوان محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
 
-                    'barcode.required' => 'بارکد محصول الزامی است',
                     'barcode.string' => 'بارکد محصول باید متن باشد',
                     'barcode.max' => 'بارکد محصول نباید بیشتر از ۲۵۵ کاراکتر باشد',
                     'barcode.unique' => 'این بارکد قبلاً ثبت شده است',
@@ -2089,6 +2136,10 @@ class ProductController extends Controller
                     'variants.*.title.required' => 'عنوان تنوع الزامی است',
                     'variants.*.title.string' => 'عنوان تنوع باید متن باشد',
                     'variants.*.title.max' => 'عنوان تنوع نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'variants.*.barcode.required' => 'بارکد تنوع الزامی است',
+                    'variants.*.barcode.string' => 'بارکد تنوع باید متن باشد',
+                    'variants.*.barcode.max' => 'بارکد تنوع نباید بیشتر از ۲۵۵ کاراکتر باشد',
+                    'variants.*.barcode.distinct' => 'بارکد تنوع‌ها نباید تکراری باشد',
 
                     'variants.*.firstWarehouse.integer' => 'انبار اولیه باید عدد صحیح باشد',
                     'variants.*.firstPrice.decimal' => 'قیمت اولیه باید عدد باشد',
@@ -2113,6 +2164,19 @@ class ProductController extends Controller
             // Find the product
             $mainProduct = Product::findOrFail($id);
 
+            foreach ($data['variants'] as $index => $variant) {
+                $barcode = trim((string) ($variant['barcode'] ?? ''));
+                $variantId = (int) ($variant['id'] ?? 0);
+                $barcodeExists = ProductItem::where('barcode', $barcode)
+                    ->when($variantId > 0, fn($query) => $query->where('id', '!=', $variantId))
+                    ->exists();
+                if ($barcodeExists) {
+                    throw ValidationException::withMessages([
+                        "variants.$index.barcode" => 'این بارکد تنوع قبلاً ثبت شده است',
+                    ]);
+                }
+            }
+
             // Handle images
             $albumData = $mainProduct->album; // Keep existing album
 
@@ -2130,7 +2194,7 @@ class ProductController extends Controller
             // Update main product
             $mainProduct->update([
                 'title' => $data['title'],
-                'barcode' => $data['barcode'],
+                'barcode' => $data['barcode'] ?? null,
                 'album' => $albumData,
                 'des' => $data['des'] ?? null,
                 'form' => isset($data['form']) ? json_decode($data['form'], true) : $mainProduct->form,
@@ -2188,6 +2252,7 @@ class ProductController extends Controller
                     'user_id' => Auth::id() ?? 1,
                     'f_id' => $mainProduct->id,
                     'title' => $variant['title'] ?: $data['title'],
+                    'barcode' => $variant['barcode'] ?? null,
                     'origin_type' => $originType,
                     'legal_docs' => $variantDocs,
                     'source_type' => 'product_definition',
@@ -2266,7 +2331,7 @@ class ProductController extends Controller
             return response()->json([
                 "status" => "success",
                 "data" => $mainProduct->load([
-                    'variants' => function($query) {
+                    'variants' => function ($query) {
                         $query->with('convertUnitRelation');
                     },
                     'categores',

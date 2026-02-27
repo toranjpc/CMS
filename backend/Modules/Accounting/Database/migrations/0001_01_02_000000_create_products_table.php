@@ -40,6 +40,7 @@ return new class extends Migration
             $table->foreignId('app_id')->nullable()->constrained('apps')->cascadeOnDelete();
             $table->foreignIdFor(User::class)->nullable()->constrained()->nullOnDelete();
             $table->string('title')->nullable();
+            $table->string('barcode')->nullable()->unique();
 
             $table->unsignedBigInteger('f_id')->nullable();
             $table->foreign('f_id')->references('id')->on('products')->cascadeOnDelete();

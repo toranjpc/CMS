@@ -167,9 +167,9 @@
                     :readonly="isView" :required="!isView" />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">شناسه اختصاصی (بارکد) *</label>
+                  <label class="form-label">شناسه اختصاصی (بارکد مادر)</label>
                   <input type="text" class="form-control" v-model="product.barcode"
-                    placeholder="شناسه اختصاصی (بارکد) محصول" :readonly="isView" :required="!isView" />
+                    placeholder="اختیاری - در صورت نیاز برای محصول مادر" :readonly="isView" />
                 </div>
                 <div class="col-md-3">
                   <label class="form-label">نرخ مالیات % *</label>
@@ -228,11 +228,23 @@
                           :placeholder="`مثال: سایز ${index + 1} یا رنگ ${index + 1}`" :readonly="isView" />
                       </div>
 
+                      <div class="col-md-2">
+                        <label class="form-label">بارکد تنوع *</label>
+                        <input type="text" class="form-control" v-model="variant.barcode"
+                          placeholder="بارکد یکتا برای این تنوع" :readonly="isView" />
+                      </div>
+
                       <div class="d-flex col-md-3">
-                        <div class="col-md-6">
-                          <label class="form-label">نوع تنوع</label>
+                        <div class="col">
+                          <label class="form-label">نوع تنوع
+                            <button v-if="isEdit && hasExistingVariantLegalDocs(variant)" type="button"
+                              class="btn btn-link btn-sm text-info p-0" title="مشاهده و دانلود مدارک قبلی"
+                              @click="openVariantLegalDocsDialog(index)">
+                              <i class="fa fa-paperclip"></i>
+                            </button>
+                          </label>
                           <select class="form-select" v-model="variant.origin_type" :disabled="isView"
-                            @change="applyOriginTypeToAllVariants(index)">
+                            @change="onVariantOriginTypeChange(index)">
                             <option value="domestic_production">تولید داخل</option>
                             <option value="without_green_sheet">بدون برگه سبز</option>
                             <option value="with_green_sheet">دارای برگه سبز</option>
@@ -240,8 +252,10 @@
                           </select>
                         </div>
 
-                        <div class="col-md-6">
-                          <label class="form-label">مدارک قانونی تنوع</label>
+                        <div class="col" :hidden="isView || variant.origin_type !== 'with_green_sheet'">
+                          <label class="form-label d-flex align-items-center gap-1">
+                            <span>مدارک قانونی تنوع</span>
+                          </label>
                           <input type="file" class="form-control" multiple
                             :disabled="isView || variant.origin_type !== 'with_green_sheet'"
                             @change="onVariantLegalDocsChange(index, $event)" />
@@ -419,6 +433,7 @@ const productVariants = ref([
   {
     id: '',
     title: '',
+    barcode: '',
     f_id: '',
     firstWarehouse: 0,
     current_stock: 0,
@@ -426,9 +441,113 @@ const productVariants = ref([
     sell_price: 0,
     origin_type: 'domestic_production',
     legal_docs: [],
+    existing_legal_docs: [],
     status: 0,
   }
 ])
+
+const toAbsoluteUrl = (url) => {
+  if (!url || typeof url !== 'string') return ''
+  const trimmed = url.trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  const base = config.public?.apiBase || config.public?.baseURL || ''
+  if (!base) return trimmed
+  const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base
+  const normalizedPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return `${normalizedBase}${normalizedPath}`
+}
+
+const normalizeVariantLegalDocs = (variant) => {
+  const candidates = [
+    variant?.existing_legal_docs,
+    variant?.legal_docs_links,
+    variant?.legal_docs_urls,
+    variant?.legal_docs
+  ]
+  const source = candidates.find((entry) => entry !== undefined && entry !== null)
+  if (!source) return []
+
+  const resolveArray = (value) => {
+    if (Array.isArray(value)) return value
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return value ? [value] : []
+      }
+    }
+    return []
+  }
+
+  return resolveArray(source)
+    .map((entry, index) => {
+      const rawUrl = typeof entry === 'string'
+        ? entry
+        : (entry?.url || entry?.path || entry?.file || entry?.link || '')
+      const url = toAbsoluteUrl(rawUrl)
+      if (!url) return null
+      const name = typeof entry === 'object'
+        ? (entry?.name || entry?.filename || entry?.title || `مدرک ${index + 1}`)
+        : `مدرک ${index + 1}`
+      return { url, name }
+    })
+    .filter(Boolean)
+}
+
+const hasExistingVariantLegalDocs = (variant) => {
+  return Array.isArray(variant?.existing_legal_docs) && variant.existing_legal_docs.length > 0
+}
+
+const escapeHtml = (value) => {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+const openVariantLegalDocsDialog = async (index) => {
+  const variant = productVariants.value[index]
+  const docs = variant?.existing_legal_docs || []
+  if (!docs.length) {
+    await Swal.fire({
+      title: 'مدرکی یافت نشد',
+      text: 'برای این تنوع، مدرک قانونیِ آپلود شده‌ای وجود ندارد.',
+      customClass: {
+        popup: 'swal-rtl'
+      }
+    })
+    return
+  }
+
+  const linksHtml = docs
+    .map((doc, i) => `
+      <a
+        href="${escapeHtml(doc.url)}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="${escapeHtml(doc.name || `مدرک ${i + 1}`)}"
+        style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:72px; height:72px; border:1px solid #e9ecef; border-radius:10px; text-decoration:none; color:#0d6efd; background:#f8f9fa;"
+        class="text-warning"
+      >
+        <i class="fa fa-file" style="font-size:2em;"></i>
+        <span style="font-size:11px; margin-top:6px; color:#495057;">${i + 1}</span>
+      </a>
+    `)
+    .join('')
+
+  await Swal.fire({
+    title: 'مدارک قانونی تنوع',
+    html: `<div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-start; direction:rtl;">${linksHtml}</div>`,
+    confirmButtonText: 'بستن',
+    customClass: {
+      popup: 'swal-rtl'
+    }
+  })
+}
 
 const selectedUnit = ref(null)
 const selectedBrand = ref(null)
@@ -462,12 +581,14 @@ const addVariant = () => {
   productVariants.value.push({
     id: '',
     name: '',
+    barcode: '',
     firstWarehouse: 0,
     firstPrice: 0,
     current_stock: 0,
     sell_price: 0,
     origin_type: 'domestic_production',
     legal_docs: [],
+    existing_legal_docs: [],
     status: 1,
     convertUnit: false,
     UnitNumber: 0,
@@ -519,12 +640,14 @@ const loadProduct = async () => {
       productVariants.value = data.variants.map(variant => ({
         id: variant.id,
         name: variant.title || '',
+        barcode: variant.barcode || '',
         firstWarehouse: variant.firstWarehouse || 0,
         firstPrice: parseFloat(variant.firstPrice) || 0,
         current_stock: variant.current_stock || 0,
         sell_price: parseFloat(variant.sell_price) || 0,
         origin_type: variant.origin_type || 'domestic_production',
         legal_docs: [],
+        existing_legal_docs: normalizeVariantLegalDocs(variant),
         status: variant.status ?? 1,
         // بارگذاری فیلدهای تبدیل واحد از دیتابیس
         convertUnit: variant.convertUnit || false,
@@ -537,12 +660,14 @@ const loadProduct = async () => {
       productVariants.value = [{
         id: '',
         name: '',
+        barcode: '',
         firstWarehouse: 0,
         firstPrice: 0,
         current_stock: 0,
         sell_price: 0,
         origin_type: 'domestic_production',
         legal_docs: [],
+        existing_legal_docs: [],
         status: 1,
         convertUnit: false,
         UnitNumber: 0,
@@ -693,6 +818,10 @@ const appendProductFields = (formData, product, editorContent) => {
   // ارسال تنوع‌ها به صورت آرایه
   productVariants.value.forEach((variant, index) => {
     const variantName = variant.name?.trim() || product.title?.trim() || ''
+    const variantBarcode = variant.barcode?.trim() || ''
+    if (!variantBarcode) {
+      throw new Error(`بارکد تنوع ${index + 1} الزامی است`)
+    }
     if (variant.origin_type === 'with_green_sheet' && (!variant.legal_docs || variant.legal_docs.length === 0) && !variant.id) {
       throw new Error(`برای تنوع ${index + 1} (دارای برگه سبز) بارگذاری مدرک الزامی است`)
     }
@@ -703,6 +832,7 @@ const appendProductFields = (formData, product, editorContent) => {
       formData.append(`variants[${index}][id]`, variant.id)
     }
     formData.append(`variants[${index}][title]`, variantName)
+    formData.append(`variants[${index}][barcode]`, variantBarcode)
     formData.append(`variants[${index}][firstWarehouse]`, normalizedFirstWarehouse)
     formData.append(`variants[${index}][firstPrice]`, variant.firstPrice || 0)
     formData.append(`variants[${index}][current_stock]`, normalizedCurrentStock)
@@ -866,18 +996,16 @@ const onVariantLegalDocsChange = (index, event) => {
   productVariants.value[index].legal_docs = files
 }
 
-const applyOriginTypeToAllVariants = (index) => {
-  const selectedType = productVariants.value[index]?.origin_type || 'domestic_production'
-  productVariants.value.forEach((variant) => {
-    variant.origin_type = selectedType
-    if (selectedType === 'service') {
-      variant.firstWarehouse = 1
-      variant.current_stock = 1
-    }
-    if (selectedType !== 'with_green_sheet') {
-      variant.legal_docs = []
-    }
-  })
+const onVariantOriginTypeChange = (index) => {
+  const variant = productVariants.value[index]
+  if (!variant) return
+  if (variant.origin_type === 'service') {
+    variant.firstWarehouse = 1
+    variant.current_stock = 1
+  }
+  if (variant.origin_type !== 'with_green_sheet') {
+    variant.legal_docs = []
+  }
 }
 
 // حذف محصول

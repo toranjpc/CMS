@@ -43,6 +43,34 @@ class InvoiceController extends Controller
         ]);
     }
 
+    private function validateNoServiceInBuyItems(string $invoiceType, array $items): void
+    {
+        if ($invoiceType !== 'buy' || empty($items)) {
+            return;
+        }
+
+        foreach ($items as $index => $item) {
+            $originType = $item['origin_type'] ?? null;
+            if ($originType === ProductItem::ORIGIN_TYPE_SERVICE) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.origin_type" => 'ثبت آیتم خدمات در فاکتور خرید مجاز نیست.',
+                ]);
+            }
+
+            $productItemId = (int) ($item['product_item_id'] ?? 0);
+            if ($productItemId <= 0) {
+                continue;
+            }
+
+            $productItem = ProductItem::find($productItemId);
+            if ($productItem && $productItem->origin_type === ProductItem::ORIGIN_TYPE_SERVICE) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.product_item_id" => 'انتخاب تنوع خدماتی در فاکتور خرید مجاز نیست.',
+                ]);
+            }
+        }
+    }
+
     public function index()
     {
         $invoices = Invoice::with(['user', 'party'])
@@ -190,6 +218,7 @@ class InvoiceController extends Controller
                 }
             }
 
+            $this->validateNoServiceInBuyItems($data['type'], $data['items']);
             $this->validateInvoiceStock($data['type'], $data['items']);
 
             // Generate invoice number
@@ -355,6 +384,7 @@ class InvoiceController extends Controller
             $targetType = $data['type'] ?? $invoice->type;
 
             if (isset($data['items'])) {
+                $this->validateNoServiceInBuyItems($targetType, $data['items']);
                 $this->validateInvoiceStock($targetType, $data['items'], (int) $invoice->id);
             }
 
